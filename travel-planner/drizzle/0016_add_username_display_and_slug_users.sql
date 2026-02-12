@@ -1,0 +1,3 @@
+-- Migration 0016 removed: username_slug and related changes are deprecated.
+-- This file has been neutralized to avoid applying slug-related schema changes.
+-- If you need to reintroduce any changes, restore from history or create a new migration.

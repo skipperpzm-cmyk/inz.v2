@@ -1,0 +1,659 @@
+@keyframes slidein-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slidein {
+  animation: slidein-toast 0.45s cubic-bezier(0.42,0,0.58,1) both;
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design tokens: define default CSS variables for the theme here.
+  Components use Tailwind classes that reference these variables (see tailwind.config.js).
+  The `ThemeProvider` can override these variables at runtime for per-page or per-component themes.
+*/
+:root {
+  --color-primary: #0ea5e9;
+  --color-primary-foreground: #0f172a;
+  --color-surface: #1f1f1f;
+  --color-surface-foreground: #eaeaea;
+  --color-surface-soft: rgba(255, 255, 255, 0.07);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-muted: #c7c7c7;
+  --color-accent: #34d399;
+  --color-accent-foreground: #052e24;
+  --color-danger: #ef4444;
+  --color-text: #f8fafc;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+/* Dashboard-specific design tokens (inspired by the sidebar glass treatment)
+   Scoped by applying the `dashboard-theme` class to the dashboard container. */
+.dashboard-theme {
+  --dashboard-accent: #6366f1; /* indigo-ish accent */
+  --dashboard-accent-2: #14b8a6; /* teal accent */
+  --dashboard-surface: rgba(15,23,42,0.6); /* slate surface */
+  --dashboard-surface-soft: rgba(15,23,42,0.45);
+  --dashboard-card-bg: rgba(15,23,42,0.48);
+  --dashboard-card-border: rgba(99,102,241,0.10);
+  --dashboard-text: #e6eef8;
+  --dashboard-btn-bg: rgba(99,102,241,0.16);
+  --dashboard-btn-hover: rgba(99,102,241,0.30);
+  --dashboard-shadow: 0 12px 40px rgba(2,6,23,0.45);
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 50%),
+    radial-gradient(circle at 80% 0%, rgba(145, 163, 255, 0.25), transparent 55%),
+    linear-gradient(135deg, #05070d 0%, #0f1625 40%, #06080f 100%);
+  background-attachment: fixed;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+button {
+  color: var(--color-text);
+}
+
+input,
+textarea {
+  border-radius: 0.75rem;
+  background-color: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+}
+
+::selection {
+  background: rgba(145, 163, 255, 0.35);
+}
+
+/* Animated decorative background shapes and subtle motion utilities */
+@keyframes float-slow {
+  0% { transform: translateY(0) translateX(0) scale(1); }
+  50% { transform: translateY(-18px) translateX(6px) scale(1.03); }
+  100% { transform: translateY(0) translateX(0) scale(1); }
+}
+
+@keyframes drift {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); }
+  50% { transform: translateX(20px) translateY(-10px) rotate(6deg); }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); }
+}
+
+@keyframes slow-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+.bg-blob { position: absolute; filter: blur(36px) saturate(120%); opacity: 0.12; transform-origin: center; }
+.blob-1 { width: 520px; height: 520px; right: -120px; top: -80px; background: linear-gradient(135deg,#0ea5e9,#6366f1); animation: float-slow 12s ease-in-out infinite; }
+.blob-2 { width: 380px; height: 380px; left: -100px; bottom: -60px; background: linear-gradient(135deg,#34d399,#06b6d4); animation: drift 18s ease-in-out infinite; opacity: 0.09; }
+.blob-3 { width: 680px; height: 260px; left: 50%; top: -140px; transform: translateX(-50%); background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), rgba(79,70,229,0.02)); animation: float-slow 20s ease-in-out infinite; }
+
+/* Dashboard button interactive effects (independent classes) */
+.dashboard-btn-effect {
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.dashboard-btn-effect:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.45);
+  transform: translateY(-2px);
+}
+.dashboard-btn-effect:active {
+  transform: translateY(0) scale(0.99);
+}
+.dashboard-btn-effect:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.06);
+}
+
+/* Selected state helper for cards */
+.dashboard-selected {
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.06);
+  background-color: rgba(255,255,255,0.06) !important;
+}
+
+.panel-hover { transition: box-shadow 220ms ease, border-color 220ms ease; }
+.panel-hover:hover { box-shadow: 0 20px 50px rgba(2,6,23,0.6); border-color: rgba(255,255,255,0.08); }
+
+/* Landing-specific card marker: keep existing interactive transitions for landing page cards. */
+.landing-card {
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+
+/* Button focus and reduced motion friendly rules */
+@media (prefers-reduced-motion: reduce) {
+  .animated-bg, .bg-blob { animation: none !important; }
+  .panel-hover { transition: none !important; }
+}
+
+/* Full-page fixed background wrapper used by the root layout. Content should sit
+   on a higher z-index so it scrolls independently above these decorative layers. */
+.app-bg { position: fixed; inset: 0; width: 100%; height: 100vh; overflow: hidden; z-index: 0; pointer-events: none; }
+.app-bg .bg-blob { opacity: 0.12; }
+
+/* Dashboard-scoped fancy button (based on .cssbuttons-io) */
+.dashboard-main .cssbuttons-io {
+  position: relative;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  /* font-size intentionally removed to allow Tailwind `text-sm` from the
+     Button component to control size (restores previous font sizing) */
+  letter-spacing: 0.05em;
+  border-radius: 0.8em;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(to right, #8e2de2, #4a00e0);
+  color: ghostwhite;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dashboard-main .cssbuttons-io svg {
+  width: 1.2em;
+  height: 1.2em;
+  margin-right: 0.5em;
+}
+
+.dashboard-main .cssbuttons-io span {
+  position: relative;
+  z-index: 10;
+  transition: color 0.4s;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.8em 1.2em 0.8em 1.05em;
+}
+
+.dashboard-main .cssbuttons-io::before,
+.dashboard-main .cssbuttons-io::after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  content: "";
+}
+
+.dashboard-main .cssbuttons-io::before {
+  background: #000;
+  width: 120%;
+  left: -10%;
+  transform: skew(30deg);
+  transition: transform 0.4s cubic-bezier(0.3, 1, 0.8, 1);
+}
+
+.dashboard-main .cssbuttons-io:hover::before {
+  transform: translate3d(100%, 0, 0);
+}
+
+.dashboard-main .cssbuttons-io:active {
+  transform: scale(0.95);
+}
+
+
+/* Responsive adjustments for blobs so they don't dominate small viewports */
+@media (max-width: 640px) {
+  .blob-1 { width: 360px; height: 360px; right: -100px; top: -60px; }
+  .blob-2 { width: 260px; height: 260px; left: -80px; bottom: -40px; }
+  .blob-3 { width: 420px; height: 180px; top: -90px; }
+  .bg-blob { filter: blur(28px); }
+}
+
+/* Lava lamp background: subtle, slow-moving glowing bubbles that rise and fall.
+   Bubbles are semi-transparent radial gradients with blur and screen blending to
+   combine with the existing dark glass background. Adjust sizes/durations
+   below for tuning. */
+@keyframes lava-rise {
+  0% { transform: translateY(30vh) scale(0.85) rotate(-6deg); opacity: 0.12; }
+  50% { transform: translateY(-20vh) scale(1.05) rotate(4deg); opacity: 0.18; }
+  100% { transform: translateY(30vh) scale(0.9) rotate(-6deg); opacity: 0.12; }
+}
+
+@keyframes lava-sway {
+  0% { transform: translateX(0) rotate(0deg); }
+  50% { transform: translateX(18px) rotate(3deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+.lava-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.lava-bubble {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(36px) saturate(140%);
+  mix-blend-mode: screen;
+  opacity: 0.14;
+  transform-origin: center;
+}
+
+.lava-bubble::before {
+  content: '';
+  position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(circle at 35% 35%, rgba(255,120,60,0.95), rgba(255,94,58,0.55) 50%, rgba(255,165,0,0.18) 75%, transparent 90%);
+}
+
+/* Sidebar-specific: New Trip CTA button styling and strong overrides to
+   prevent dashboard-global button borders/outlines from affecting it. */
+.sidebar-new-trip-btn,
+.sidebar-new-trip-btn > * {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+}
+
+.sidebar-new-trip-btn::before,
+.sidebar-new-trip-btn::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Ensure smooth transitions; preserve active scaling and backdrop blur */
+.sidebar-new-trip-btn {
+  transition: all 300ms ease-in-out;
+  will-change: transform, filter, background;
+}
+
+.sidebar-new-trip-btn:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.08) !important;
+  -webkit-box-shadow: 0 0 0 4px rgba(99,102,241,0.08) !important;
+}
+
+/* Inner foreground: ensure glass effect and no extra borders */
+.sidebar-new-trip-btn > span {
+  backdrop-filter: blur(12px) !important;
+}
+
+/* One-time bounce animation class (used to avoid continuous bounce while holding) */
+/* (removed bounce-once helper — active:animate-bounce is used instead) */
+
+.lava-1 { width: 420px; height: 420px; left: 8%; bottom: -20vh; animation: lava-rise 18s ease-in-out infinite, lava-sway 6s ease-in-out infinite; }
+.lava-2 { width: 320px; height: 320px; left: 35%; bottom: -30vh; animation: lava-rise 22s ease-in-out 2s infinite, lava-sway 7s ease-in-out 1s infinite; }
+.lava-3 { width: 500px; height: 260px; left: 62%; bottom: -18vh; animation: lava-rise 20s ease-in-out 1s infinite, lava-sway 8s ease-in-out 2s infinite; }
+.lava-4 { width: 260px; height: 260px; left: 80%; bottom: -25vh; animation: lava-rise 24s ease-in-out 3s infinite, lava-sway 9s ease-in-out 0.5s infinite; }
+
+/* Lower the effect intensity on small screens */
+@media (max-width: 768px) {
+  .lava-bubble { opacity: 0.11; filter: blur(28px) saturate(120%); }
+  .lava-1 { width: 300px; height: 300px; left: -6%; }
+  .lava-2 { width: 220px; height: 220px; left: 24%; }
+  .lava-3 { width: 360px; height: 200px; left: 56%; }
+  .lava-4 { width: 200px; height: 200px; left: 78%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lava-bubble { animation: none !important; }
+}
+
+/* Prevent layout shift when vertical scrollbar appears/disappears across pages.
+   Always reserve scrollbar space and prefer a stable gutter to avoid horizontal shifts. */
+html {
+  /* No reserved scrollbar gutter; allow default browser behavior */
+}
+
+body {
+  /* Use automatic vertical scrolling: no forced scrollbar when content fits viewport */
+  overflow-y: auto;
+}
+
+/* Helper class used by specific pages to disable vertical scrolling
+   Applied at runtime (e.g. on Login/Register) so other pages keep normal scrolling */
+/* Removed `.no-scroll` helper to ensure native scrolling is always available. */
+
+/* Dashboard-scoped card and input themes that mirror the sidebar glass look.
+   Use Tailwind utilities to align cards with the sidebar hue (indigo).
+   These rules apply only inside `.dashboard-main` so landing/public pages remain unchanged. */
+.dashboard-main .card,
+.dashboard-main .dashboard-card {
+  /* Use neutral glass matching the sidebar: translucent surface with subtle border */
+  @apply bg-white/5 backdrop-blur-md rounded-xl border-[3px] border-white/10 text-white;
+  box-shadow: 0 20px 40px rgba(2,6,23,0.45) !important;
+}
+
+.dashboard-main input,
+.dashboard-main textarea,
+.dashboard-main select {
+  @apply bg-white/5 border-white/10 text-white;
+}
+
+/* Buttons inside the dashboard should support hover fills and transitions. */
+.dashboard-main .button-primary,
+.dashboard-main button {
+  background-color: var(--dashboard-btn-bg);
+  color: var(--dashboard-text);
+  /* keep color and style but delegate width so we can uniformly set 3px elsewhere */
+  border-style: solid;
+  border-color: var(--dashboard-card-border);
+  transition: background-color 200ms ease-in-out, box-shadow 200ms ease-in-out, transform 150ms ease;
+}
+
+.dashboard-main .button-primary,
+.dashboard-main button,
+.dashboard-main .dashboard-btn-effect {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+/* Force 3px border width for dashboard buttons and related controls while preserving color. */
+.dashboard-main button,
+.dashboard-main .dashboard-btn-effect,
+.dashboard-main .button-primary {
+  border-width: 3px !important;
+}
+
+/* Ensure cards and panels remain static on hover inside the authenticated dashboard.
+   This neutralizes any transform (translate/scale/rotate) that might be applied
+   to cards or their children by utility classes or third-party components.
+   Scoped to `.dashboard-main` so landing/public pages remain unaffected. */
+.dashboard-main .card,
+.dashboard-main .dashboard-card,
+.dashboard-main .card *:not(button),
+.dashboard-main .dashboard-card *:not(button) {
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+.dashboard-main .card:hover,
+.dashboard-main .dashboard-card:hover,
+.dashboard-main .card:focus,
+.dashboard-main .dashboard-card:focus,
+.dashboard-main .card:active,
+.dashboard-main .dashboard-card:active,
+.dashboard-main .card:hover *:not(button),
+.dashboard-main .dashboard-card:hover *:not(button),
+.dashboard-main .card:focus *:not(button),
+.dashboard-main .dashboard-card:focus *:not(button),
+.dashboard-main .card:active *:not(button),
+.dashboard-main .dashboard-card:active *:not(button) {
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* Prevent unintended truncation of page and card titles inside the dashboard.
+   This is scoped to `.dashboard-main` so landing/other areas keep their truncate behavior. */
+.dashboard-main h1,
+.dashboard-main h2,
+.dashboard-main h3,
+.dashboard-main .card h1,
+.dashboard-main .card h2,
+.dashboard-main .card h3,
+.dashboard-main .dashboard-card h1,
+.dashboard-main .dashboard-card h2,
+.dashboard-main .dashboard-card h3,
+.dashboard-main .page-title,
+.dashboard-main .section-title {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* Neutralize Tailwind's `truncate` inside dashboard pages so long titles wrap instead of ellipsis. */
+.dashboard-main .truncate {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* Dashboard-scoped: remove bright focus/active glow for buttons while preserving hover.
+   Use Tailwind utilities via @apply so behavior stays consistent with design system. */
+.dashboard-main button,
+.dashboard-main .dashboard-btn-effect,
+.dashboard-main .button-primary {
+  @apply focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0;
+}
+
+.dashboard-main button:focus,
+.dashboard-main .dashboard-btn-effect:focus,
+.dashboard-main .button-primary:focus {
+  @apply shadow-none;
+}
+
+.dashboard-main button:active,
+.dashboard-main .dashboard-btn-effect:active,
+.dashboard-main .button-primary:active {
+  @apply active:shadow-none active:ring-0;
+}
+
+/* Strong overrides to ensure no external visual effects appear on dashboard buttons.
+   - Removes any `ring-*`, `focus:ring-*`, `outline`, `box-shadow`, and transform effects
+   - Keeps background hover fills and transitions intact
+   - Neutralizes pseudo-element overlays used for decorative glows */
+.dashboard-main button,
+.dashboard-main .dashboard-btn-effect,
+.dashboard-main .button-primary {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Gradient outline using a ::before pseudo-element that matches the button's
+   border-radius. Scoped to .dashboard-main so sidebar and public buttons are
+   unaffected. */
+.dashboard-main .cssbuttons-io,
+.dashboard-main .dashboard-btn-effect,
+.dashboard-main .button-primary,
+.dashboard-main button {
+  position: relative; /* establish containing block for pseudo-element */
+  overflow: visible;
+}
+
+.dashboard-main .cssbuttons-io::before,
+.dashboard-main .dashboard-btn-effect::before,
+.dashboard-main .button-primary::before,
+.dashboard-main button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: inherit; /* ensures it follows the button's border-radius */
+  transition: border-image 300ms ease-in-out, box-shadow 300ms ease-in-out, opacity 300ms ease-in-out;
+  z-index: 0;
+}
+
+/* Ensure button content sits above the outline */
+.dashboard-main .cssbuttons-io > *,
+.dashboard-main .dashboard-btn-effect > *,
+.dashboard-main .button-primary > *,
+.dashboard-main button > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Hover: apply gradient border via border-image and a gentle glow */
+.dashboard-main .cssbuttons-io:hover::before,
+.dashboard-main .dashboard-btn-effect:hover::before,
+.dashboard-main .button-primary:hover::before,
+.dashboard-main button:hover::before {
+  /* Generic gradient outline for dashboard buttons (kept minimal) */
+  border-image-source: linear-gradient(90deg, #4a00e0, #8e2de2);
+  border-image-slice: 1;
+  border-image-repeat: round;
+  opacity: 1;
+  box-shadow: 0 10px 36px rgba(74,0,224,0.18);
+}
+
+/* Travel-type buttons: pseudo-elements removed below to eliminate any outline.
+   No pseudo-element creation for `.trip-type-btn` is present to ensure there
+   is no outline or border-image applied on hover. */
+
+/* Match Tailwind classes used for the selected travel-type buttons: from-purple-600 -> to-indigo-600 */
+/* removed specific trip-type hover border-image rule to ensure travel-type
+   buttons do not show any outline; pseudo-elements are explicitly disabled
+   below for `.trip-type-btn`. */
+
+/* Also reinforce hover transition on the button itself for smoothness */
+.dashboard-main .cssbuttons-io:hover,
+.dashboard-main .dashboard-btn-effect:hover,
+.dashboard-main .button-primary:hover,
+.dashboard-main button:hover {
+  transition: all 300ms ease-in-out;
+}
+
+/* Active (pressed) state: slight scale down while keeping outline */
+.dashboard-main .cssbuttons-io:active,
+.dashboard-main .dashboard-btn-effect:active,
+.dashboard-main .button-primary:active,
+.dashboard-main button:active {
+  transform: scale(0.95);
+}
+
+/* Dashboard button hover feedback: subtle brightness change and glow.
+   Scoped to `.dashboard-main` so sidebar and public buttons are unaffected. */
+.dashboard-main .cssbuttons-io:hover,
+.dashboard-main .dashboard-btn-effect:hover,
+.dashboard-main .button-primary:hover,
+.dashboard-main button:hover {
+  @apply transition-all duration-200 ease-in-out;
+  filter: brightness(0.95);
+  box-shadow: 0 12px 36px rgba(74,0,224,0.18) !important;
+}
+
+/* Active press: slight scale down. Kept scoped to dashboard so sidebar buttons remain unchanged. */
+.dashboard-main .cssbuttons-io:active,
+.dashboard-main .dashboard-btn-effect:active,
+.dashboard-main .button-primary:active,
+.dashboard-main button:active {
+  transform: scale(0.95);
+}
+
+.dashboard-main button:hover,
+.dashboard-main .dashboard-btn-effect:hover,
+.dashboard-main .button-primary:hover {
+  /* preserve hover background-color/transition but remove any shadow/translate */
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  transform: none !important;
+}
+
+.dashboard-main button:focus,
+.dashboard-main button:focus-visible,
+.dashboard-main .dashboard-btn-effect:focus,
+.dashboard-main .dashboard-btn-effect:focus-visible,
+.dashboard-main .button-primary:focus,
+.dashboard-main .button-primary:focus-visible {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+  transform: none !important;
+}
+
+.dashboard-main button:active,
+.dashboard-main .dashboard-btn-effect:active,
+.dashboard-main .button-primary:active {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+  transform: none !important;
+}
+
+/* Remove decorative pseudo-elements that might create overlays/halos */
+.dashboard-main button::before,
+.dashboard-main button::after,
+.dashboard-main .dashboard-btn-effect::before,
+.dashboard-main .dashboard-btn-effect::after,
+.dashboard-main .button-primary::before,
+.dashboard-main .button-primary::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Explicitly disable gradient outline/pseudo-elements for travel-type buttons only.
+   This ensures City Break / Wakacje / Przygoda / Delegacja / Rodzinna buttons
+   have no hover outline while preserving other dashboard button outlines. */
+.dashboard-main .trip-type-btn::before,
+.dashboard-main .trip-type-btn::after {
+  /* Ensure no pseudo-element outlines/gradients are created for trip-type buttons */
+  content: none !important;
+  display: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.dashboard-main .trip-type-btn {
+  /* Remove any forced border or outline on these specific buttons while
+     preserving their shape, blur and padding. This overrides the generic
+     `.dashboard-main button { border-width: 3px !important }` rule. */
+  border: 0 !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  -webkit-box-shadow: none !important;
+  /* Keep clipping so gradient/background stays within rounded corners */
+  overflow: hidden !important;
+  /* Preserve the glass blur already on the element (do not remove backdrop-blur-sm) */
+}
+
+/* Allow active/hover transforms for these buttons even if dashboard-wide
+   rules try to neutralize transforms. Keep active scale used by Tailwind. */
+.dashboard-main .trip-type-btn:active {
+  transform: scale(0.95) !important;
+}
+.dashboard-main .trip-type-btn:hover {
+  /* Do not introduce shadows/outline on hover; preserve subtle hover bg changes */
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+  /* Slightly darken on hover for gradient buttons */
+  filter: brightness(0.95);
+}
+
+/* Smooth transitions for background, scale and shadow on trip-type buttons */
+.dashboard-main .trip-type-btn {
+  transition: all 300ms ease-in-out;
+  -webkit-transition: all 300ms ease-in-out;
+  will-change: transform, filter, box-shadow, background;
+}
+
+/* Keyboard focus styling: accessible but no browser outline */
+.dashboard-main .trip-type-btn:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.10) !important; /* subtle indigo focus */
+  -webkit-box-shadow: 0 0 0 4px rgba(99,102,241,0.10) !important;
+}
+
+/* Selected visual using inset shadow instead of border to avoid seams */
+.dashboard-main .trip-type-btn[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08) !important;
+  -webkit-box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08) !important;
+}
+
+/* Ensure hover on selected state keeps subtle inset but still darkens */
+.dashboard-main .trip-type-btn[aria-pressed="true"]:hover {
+  filter: brightness(0.93);
+}
+
+

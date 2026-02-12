@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./.next",
+    "jsx": "preserve",
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "app/**/*",
+    "components/**/*",
+    "hooks/**/*",
+    "lib/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "tests/**/*"
+  ]
+}

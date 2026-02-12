@@ -1,0 +1,2 @@
+-- Migration 0018 removed: backfilling and enforcing username_slug/current_slug is deprecated.
+-- This file has been neutralized to avoid applying slug-related schema changes.

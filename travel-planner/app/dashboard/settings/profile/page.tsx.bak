@@ -1,0 +1,15 @@
+"use client";
+import React, { useState, useRef, useEffect } from 'react';
+import Card from '../../../../components/Card';
+import Button from '../../../../components/ui/button';
+import { useToast } from '../../../../components/toast/ToastProvider';
+
+export default function Page() {
+  const toast = useToast();
+  const defaultBackground = '/backgrounds/background_user_1.svg';
+  const [pseudonim, setPseudonim] = useState('Przykładowy użytkownik');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  // backup of original file saved for diagnostics
+  return null as any;
+}

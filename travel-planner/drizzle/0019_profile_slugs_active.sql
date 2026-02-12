@@ -1,0 +1,2 @@
+-- Migration 0019 removed: profile_slugs active column is deprecated with slug flow removal.
+-- This file has been neutralized to avoid making changes to profile_slugs.

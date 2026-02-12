@@ -1,0 +1,5 @@
+# Environment secrets
+.env.local
+/.next
+node_modules/
+dist/

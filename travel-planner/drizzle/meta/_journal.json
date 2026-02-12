@@ -1,0 +1,33 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1767803393963,
+      "tag": "0000_famous_colossus",
+      "breakpoints": true
+    }
+    ,
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767803394000,
+      "tag": "0001_add_background_url",
+      "breakpoints": false
+    }
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767803394000,
+      "tag": "0001_add_background_url",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767803395000,
+      "tag": "0002_drop_background_url",
+      "breakpoints": false
+    }

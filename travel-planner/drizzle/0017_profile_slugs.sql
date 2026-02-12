@@ -1,0 +1,2 @@
+-- Migration 0017 removed: profile_slugs are deprecated.
+-- This file has been neutralized to avoid creating the profile_slugs table.

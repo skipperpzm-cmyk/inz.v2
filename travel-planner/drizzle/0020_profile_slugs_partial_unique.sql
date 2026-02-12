@@ -1,0 +1,2 @@
+-- Migration 0020 removed: partial unique index on profile_slugs is no longer required.
+-- This file has been neutralized to avoid creating or dropping indexes related to profile_slugs.

@@ -1,0 +1,7 @@
+version: "2"
+tunnels:
+  travel-planner:
+    proto: http
+    addr: 3000
+    basic_auth:
+      - "kluska:kluska02"
