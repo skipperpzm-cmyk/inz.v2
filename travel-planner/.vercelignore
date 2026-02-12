@@ -1,0 +1,13 @@
+# Ignore local dev/test files for Vercel deployment
+.env.local
+node_modules
+.git
+.gitignore
+README.md
+DB_SETUP.md
+SLUG_REMOVAL_README.md
+*.log
+.vscode
+scripts/
+drizzle/
+migrations/
