@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1">
+      <stop offset="0%" stop-color="#6EE7B7" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g1)" />
+  <g opacity="0.12">
+    <circle cx="-100" cy="150" r="160" fill="#fff">
+      <animate attributeName="cx" from="-200" to="1000" dur="18s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="900" cy="420" r="120" fill="#fff">
+      <animate attributeName="cx" from="900" to="-300" dur="22s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <g opacity="0.08">
+    <rect x="-200" y="50" width="400" height="400" rx="40" fill="#fff">
+      <animate attributeName="x" from="-400" to="1200" dur="26s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>

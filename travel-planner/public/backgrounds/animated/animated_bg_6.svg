@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="a6" x1="0" x2="1">
+      <stop offset="0%" stop-color="#7AD2FF" />
+      <stop offset="100%" stop-color="#7F7BFF" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#a6)" />
+  <g opacity="0.12" fill="#fff">
+    <!-- many orbiting rings -->
+    <g>
+      <circle cx="200" cy="200" r="60" fill="none" stroke="#fff" stroke-opacity="0.08" stroke-width="8">
+        <animate attributeName="r" values="60;120;60" dur="12s" repeatCount="indefinite" />
+      </circle>
+    </g>
+    <g>
+      <circle cx="900" cy="500" r="90" fill="none" stroke="#fff" stroke-opacity="0.06" stroke-width="10">
+        <animate attributeName="r" values="90;200;90" dur="20s" repeatCount="indefinite" />
+      </circle>
+    </g>
+  </g>
+  <g opacity="0.07">
+    <path d="M0 400 C200 300 400 500 600 400 S1000 300 1200 400 L1200 800 L0 800 Z" fill="#fff">
+      <animate attributeName="d" dur="14s" repeatCount="indefinite"
+        values="M0 400 C200 320 400 480 600 400 S1000 320 1200 400 L1200 800 L0 800 Z; M0 420 C200 380 400 520 600 420 S1000 360 1200 420 L1200 800 L0 800 Z; M0 400 C200 320 400 480 600 400 S1000 320 1200 400 L1200 800 L0 800 Z"/>
+    </path>
+  </g>
+</svg>

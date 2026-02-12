@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="a4" x1="0" x2="1">
+      <stop offset="0%" stop-color="#FFB86B" />
+      <stop offset="100%" stop-color="#FF6B6B" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#a4)" />
+  <g fill="#fff" opacity="0.12">
+    <!-- many small triangles moving -->
+    <g>
+      <polygon points="0,30 20,70 -20,70" transform="translate(100,100)" opacity="0.9">
+        <animateTransform attributeName="transform" type="translate" values="100,100;1100,50;100,700;100,100" dur="18s" repeatCount="indefinite" />
+      </polygon>
+    </g>
+    <g>
+      <polygon points="0,0 30,40 -30,40" transform="translate(300,400) scale(1.2)" opacity="0.7">
+        <animateTransform attributeName="transform" type="translate" values="300,400;200,50;900,600;300,400" dur="22s" repeatCount="indefinite" />
+      </polygon>
+    </g>
+    <!-- repeating triangles via use -->
+    <g opacity="0.08">
+      <use href="#tri" x="50" y="50" />
+    </g>
+  </g>
+  <g id="tri" transform="translate(0,0)">
+    <polygon points="0,0 30,40 -30,40" fill="#fff" opacity="0.06">
+      <animateTransform attributeName="transform" type="translate" values="0,0;1200,0;0,800;0,0" dur="26s" repeatCount="indefinite" />
+    </polygon>
+  </g>
+</svg>
