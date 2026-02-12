@@ -8,6 +8,7 @@
     "migrate:background:pg": "node ./scripts/migrate-with-pg.js",
     "migrate:auto": "node ./scripts/auto-migrate.js",
     "build": "next build",
+    "vercel-build": "next build",
     "start": "next start",
     "tunnel": "ngrok http 3000",
     "tunnel:eu": "ngrok http --region=eu 3000",
