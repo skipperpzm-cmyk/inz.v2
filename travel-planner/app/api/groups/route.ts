@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { getCurrentUser } from '@/lib/auth';
 import { requireDb } from '@/src/db/db';
 
@@ -18,6 +20,7 @@ function randomSuffix(len = 4) {
 }
 
 export async function POST(req: Request) {
+  const isDev = process.env.NODE_ENV !== 'production';
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
@@ -44,7 +47,8 @@ export async function POST(req: Request) {
     let unique = false;
     // Try deterministic suffixes first (base, base-2, base-3, ...)
     for (let i = 1; i <= 20; i++) {
-      const check = await (db as any).execute('select id from public.groups where slug = $1 limit 1', [slug]);
+      try { console.info('groups: slug check', { slug }); } catch (e) { }
+      const check = await (db as any).execute(sql`select id from public.groups where slug = ${slug} limit 1`);
       const rows = (check as any).rows ?? check;
       if (!Array.isArray(rows) || rows.length === 0) {
         unique = true;
@@ -57,7 +61,7 @@ export async function POST(req: Request) {
     if (!unique) {
       for (let attempts = 0; attempts < 5; attempts++) {
         const candidate = `${base}-${randomSuffix(4)}`;
-        const check = await (db as any).execute('select id from public.groups where slug = $1 limit 1', [candidate]);
+        const check = await (db as any).execute(sql`select id from public.groups where slug = ${candidate} limit 1`);
         const rows = (check as any).rows ?? check;
         if (!Array.isArray(rows) || rows.length === 0) {
           slug = candidate;
@@ -71,14 +75,27 @@ export async function POST(req: Request) {
 
     if (!unique) throw new Error('Failed to generate unique slug');
 
-    const insertSql = `insert into public.groups (id, name, slug, description, is_private, created_by) values (gen_random_uuid(), $1, $2, $3, $4, $5) returning id, name, slug, description, is_private, created_by, created_at, updated_at`;
-    const inserted = await (db as any).execute(insertSql, [name, slug, description, is_private, user.id]);
+    const id = randomUUID();
+    const inserted = await (db as any).execute(sql`
+      insert into public.groups (id, name, slug, description, is_private, created_by)
+      values (${id}, ${name}, ${slug}, ${description}, ${is_private}, ${user.id})
+      returning id, name, slug, description, is_private, created_by, created_at, updated_at
+    `);
     const insertedRows = (inserted as any).rows ?? inserted;
     const group = Array.isArray(insertedRows) && insertedRows.length ? insertedRows[0] : null;
 
     return NextResponse.json({ group });
-  } catch (err) {
+  } catch (err: any) {
     console.error('create group error', err);
-    return NextResponse.json({ error: 'Failed to create group' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to create group',
+      details: isDev ? {
+        message: err?.message || String(err),
+        code: err?.code || null,
+        stack: err?.stack || null,
+        name: err?.name || null,
+        cause: err?.cause || null,
+      } : undefined,
+    }, { status: 500 });
   }
 }

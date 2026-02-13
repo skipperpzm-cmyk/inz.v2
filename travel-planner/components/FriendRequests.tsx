@@ -33,7 +33,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
       onAccepted?.(invite);
       if (setTooltip) setTooltip(null);
     } catch (err) {
-      setError('Blad akceptacji');
+      setError('Błąd akceptacji');
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
       onRejected?.(invite);
       if (setTooltip) setTooltip(null);
     } catch (err) {
-      setError('Blad odrzucenia');
+      setError('Błąd odrzucenia');
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
       setLoading(true);
       await cancelInvite(invite.id);
     } catch (err) {
-      setError('Blad usuwania zaproszenia');
+      setError('Błąd usuwania zaproszenia');
     } finally {
       setLoading(false);
     }
@@ -76,12 +76,12 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
       ) : error ? (
         <div className="text-red-400">{error}</div>
       ) : pendingInvites.length === 0 && sentInvites.length === 0 ? (
-        <div className="text-xs text-white/60">Brak zaproszen</div>
+        <div className="text-xs text-white/60">Brak zaproszeń</div>
       ) : (
         <div className="space-y-4 animate-slidein">
           {pendingInvites.length > 0 && (
             <div>
-              <div className="text-xs text-white/60 mb-2">Przychodzace</div>
+              <div className="text-xs text-white/60 mb-2">Przychodzące</div>
               <ul className="space-y-2">
                 {pendingInvites.map((invite) => (
                   <li key={invite.id} className="py-0.5 m-0 relative">
@@ -123,7 +123,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
                         <CheckIcon className="w-3 h-3" />
                       </button>
                       <button
-                        aria-label="Odrzuc zaproszenie"
+                        aria-label="Odrzuć zaproszenie"
                         className="w-6 h-6 flex items-center justify-center rounded-full border border-red-400 text-red-500 hover:bg-red-500 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-red-300 -ml-[2px]"
                         onClick={(e) => {
                           if (setTooltip) setTooltip(null);
@@ -156,7 +156,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
 
           {sentInvites.length > 0 && (
             <div>
-              <div className="text-xs text-white/60 mb-2">Wyslane</div>
+              <div className="text-xs text-white/60 mb-2">Wysłane</div>
               <ul className="space-y-2">
                 {sentInvites.map((invite) => (
                   <li key={invite.id} className="py-0.5 m-0 relative">
@@ -174,7 +174,7 @@ export default function FriendRequests({ onAccepted, onRejected, setTooltip }: F
                       </div>
                       <div className="relative ml-2">
                         <button
-                          aria-label="Usun wyslane zaproszenie"
+                          aria-label="Usuń wysłane zaproszenie"
                           className="w-6 h-6 flex items-center justify-center rounded-full border border-red-400 text-red-500 hover:bg-red-500 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-red-300"
                           onClick={e => {
                             if (setTooltip) setTooltip(null);

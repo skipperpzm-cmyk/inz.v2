@@ -8,6 +8,7 @@ export async function GET() {
 
   try {
     const db = requireDb();
+    // UWAGA: interpolacja user.id jest bezpieczna, bo to nasz własny ID z sesji
     const res = await (db as any).execute(
       `select
         gi.id,
@@ -22,9 +23,8 @@ export async function GET() {
       from public.group_invites gi
       join public.groups g on g.id = gi.group_id
       join public.profiles p on p.id = gi.from_user_id
-      where gi.to_user_id = $1 and gi.status = 'pending'
-      order by gi.created_at desc`,
-      [user.id]
+      where gi.to_user_id = '${user.id}' and gi.status = 'pending'
+      order by gi.created_at desc`
     );
     const rows = (res as any).rows ?? res;
     const data = Array.isArray(rows) ? rows : [];

@@ -14,7 +14,7 @@ export default function FriendInvitesIcon({ count = 0, onClick, ariaLabel = 'Zap
       aria-label={ariaLabel}
       className="relative inline-flex items-center justify-center w-9 h-9"
     >
-      <InboxIcon className="w-4 h-4" aria-hidden />
+      <InboxIcon className="w-5 h-5" aria-hidden />
       {count > 0 && (
         <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white bg-red-500 rounded-full shadow-sm">
           {count > 99 ? '99+' : count}

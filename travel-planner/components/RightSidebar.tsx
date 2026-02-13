@@ -1,404 +1,26 @@
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UserGroupIcon, MagnifyingGlassIcon, UserPlusIcon, UserIcon, UserMinusIcon } from '@heroicons/react/24/outline';
-import { ChevronLeftIcon as ChevronLeftSolid } from '@heroicons/react/24/solid';
+import { UserGroupIcon, UserPlusIcon, UserIcon, InboxIcon } from '@heroicons/react/24/outline';
 import { useChat } from './chat/ChatContext';
 import AddFriendInline from './AddFriendInline';
 import FriendInvitesIcon from './FriendInvitesIcon';
 import FriendRequests from './FriendRequests';
-import { useFriendContext, FriendRelationState } from './FriendContext';
+import { useFriendContext } from './FriendContext';
 import { useGroupContext, Group, GroupInvite, Member } from './GroupContext';
 import Modal from './Modal';
 import Button from './ui/button';
-
-function BackButton({ onClick }: { onClick: () => void }) {
-  const [isPressed, setIsPressed] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseDown={() => setIsPressed(true)}
-      onMouseUp={() => setIsPressed(false)}
-      onMouseLeave={() => setIsPressed(false)}
-      className={`flex items-center justify-center w-7 h-7 text-white hover:text-indigo-300 outline-none border-none mr-2 ml-[2px] transition-all duration-100 hover:bg-white/10 rounded-full${isPressed ? ' scale-95' : ''}`}
-      aria-label="Powrót"
-      style={{ boxShadow: 'none', border: 'none' }}
-    >
-      <GradientChevronLeftIcon className="w-5 h-5" />
-    </button>
-  );
-}
-
-function DodajZnajomegoButton({ onClick }: { onClick: () => void }) {
-  const [isPressed, setIsPressed] = useState(false);
-  const handleMouseDown = () => setIsPressed(true);
-  const handleMouseUp = () => setIsPressed(false);
-  const handleMouseLeave = () => setIsPressed(false);
-  const handleClick = () => { onClick(); };
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      className={
-        `mt-2 flex items-center justify-center rounded-full py-[8px] text-xs font-semibold tracking-tight focus:outline-none bg-gradient-to-r from-[#5865F2] via-[#7C3AED] to-[#A78BFA] text-indigo-100 transition-transform duration-100 hover:brightness-110 hover:ring-2 hover:ring-indigo-400/40${isPressed ? ' scale-95' : ''}`
-      }
-      style={{ paddingLeft: '10px', paddingRight: '10px' }}
-    >
-      <UserPlusIcon className="w-4 h-4 text-white mr-1" aria-hidden />
-      <span>Dodaj pierwszego znajomego</span>
-    </button>
-  );
-}
-
-function NowaGrupaButton({ onClick }: { onClick: () => void }) {
-  const [isPressed, setIsPressed] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={() => setIsPressed(true)}
-      onMouseUp={() => setIsPressed(false)}
-      onMouseLeave={() => setIsPressed(false)}
-      className={
-        `mt-2 flex items-center justify-center rounded-full py-[8px] text-xs font-semibold tracking-tight focus:outline-none bg-gradient-to-r from-[#10B981] via-[#22C55E] to-[#84CC16] text-white transition-transform duration-100 hover:brightness-110 hover:ring-2 hover:ring-emerald-400/40${isPressed ? ' scale-95' : ''}`
-      }
-      style={{ paddingLeft: '10px', paddingRight: '10px' }}
-    >
-      <UserGroupIcon className="w-4 h-4 text-white mr-1" aria-hidden />
-      <span>Nowa grupa</span>
-    </button>
-  );
-}
-
-type FriendRowProps = {
-  id: string;
-  name: string;
-  publicId?: string | null;
-  avatarUrl?: string | null;
-  online?: boolean;
-  // isActive: boolean; // usunięte, niepotrzebne
-  unread: number;
-  isMenuOpen: boolean;
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  relationState: FriendRelationState;
-  onOpenChat: (id: string, name: string, avatarUrl: string | null, chatId: string) => void;
-  onOpenMenu: (id: string) => void;
-  onConfirmRemove: (id: string) => void;
-  onCloseMenu: () => void;
-};
-
-const FriendRow = React.memo(function FriendRow({
-  id,
-  name,
-  publicId,
-  avatarUrl,
-  online,
-  unread,
-  isMenuOpen,
-  menuRef,
-  relationState,
-  onOpenChat,
-  onOpenMenu,
-  onConfirmRemove,
-  onCloseMenu,
-}: FriendRowProps) {
-  const chatId = `friend:${id}`;
-  const [isPressed, setIsPressed] = useState(false);
-
-  const handleClick = () => {
-    setIsPressed(true);
-    setTimeout(() => setIsPressed(false), 125);
-    onOpenChat(id, name, avatarUrl ?? null, chatId);
-  };
-
-  return (
-    <motion.li
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.25 }}
-      layout
-      className="py-0.5 m-0 relative"
-    >
-      <div
-        className="w-full text-left rounded-lg transition group bg-transparent hover:bg-indigo-400/30 transition-transform duration-100"
-        style={{ cursor: 'pointer' }}
-        onClick={handleClick}
-        tabIndex={0}
-        role="button"
-        aria-pressed={isPressed}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-white/8 flex items-center justify-center text-sm font-semibold text-white relative">
-            <div className={`absolute right-[6px] bottom-[6px] w-2 h-2 rounded-full transition-colors duration-200 ${online ? 'bg-green-400' : 'bg-gray-400'}`} aria-hidden="true"></div>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
-            ) : (
-              (name || '??').slice(0, 2).toUpperCase()
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm truncate transition-colors duration-200 text-white group-hover:text-indigo-100 group-focus:text-indigo-50">{name}</div>
-            <div className="text-xs text-white/60">ID: {publicId ?? '—'}</div>
-          </div>
-          {unread > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white min-w-[1.5rem] h-5 transition-all duration-300 animate-fadein">
-              {unread}
-            </span>
-          )}
-        </div>
-      </div>
-      <button
-        type="button"
-        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 rounded-full text-white hover:bg-white/10 focus:bg-white/20 flex items-center justify-center w-7 h-7 p-0 absolute top-1 right-1"
-        tabIndex={-1}
-        aria-label="Więcej akcji"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenMenu(id);
-        }}
-      >
-        <span className="text-base font-bold select-none flex items-center justify-center w-4 h-4">...</span>
-      </button>
-      {isMenuOpen && (
-        <div
-          ref={menuRef}
-          className="absolute right-2 top-10 z-[999] w-32 py-1 px-1 text-xs rounded-md shadow-lg border transition-all duration-200 ease-out origin-top-right bg-white text-gray-900 border-white/10 dark:bg-gray-900 dark:text-white dark:border-gray-700"
-          style={{
-            minWidth: 96,
-            maxWidth: 140,
-            maxHeight: 120,
-            overflow: 'auto',
-            transform: isMenuOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-8px)',
-            opacity: isMenuOpen ? 1 : 0,
-            pointerEvents: isMenuOpen ? 'auto' : 'none',
-          }}
-        >
-          <button
-            type="button"
-            className={`w-full text-left px-1.5 py-1 rounded flex items-center gap-2 transition-colors
-              ${relationState === FriendRelationState.FRIENDS
-                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
-                : 'text-gray-400 cursor-not-allowed bg-transparent'}
-            `}
-            disabled={relationState !== FriendRelationState.FRIENDS}
-            onClick={() => {
-              onCloseMenu();
-              if (relationState === FriendRelationState.FRIENDS) {
-                onConfirmRemove(id);
-              }
-            }}
-          >
-            <UserMinusIcon className="w-4 h-4 mr-1 text-red-500 dark:text-red-400" aria-hidden="true" />
-            <span>Usuń znajomego</span>
-          </button>
-        </div>
-      )}
-    </motion.li>
-  );
-});
-
-type FriendSelectRowProps = {
-  friend: { id: string; name: string; publicId?: string | null; avatarUrl?: string | null; online?: boolean };
-  selected: boolean;
-  onToggle: (id: string) => void;
-};
-
-const FriendSelectRow = React.memo(function FriendSelectRow({ friend, selected, onToggle }: FriendSelectRowProps) {
-  const [isPressed, setIsPressed] = useState(false);
-  return (
-    <div className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="w-9 h-9 rounded-full bg-white/8 flex items-center justify-center text-xs font-semibold text-white">
-          {friend.avatarUrl ? (
-            <img src={friend.avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
-          ) : (
-            (friend.name || '??').slice(0, 2).toUpperCase()
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm text-white truncate">{friend.name}</div>
-          <div className="text-xs text-white/50 truncate">ID: {friend.publicId ?? '—'}</div>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={() => onToggle(friend.id)}
-        onMouseDown={() => setIsPressed(true)}
-        onMouseUp={() => setIsPressed(false)}
-        onMouseLeave={() => setIsPressed(false)}
-        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-transform duration-100 ${
-          selected
-            ? 'bg-emerald-500/80 text-white'
-            : 'bg-white/10 text-white hover:bg-white/20'
-        }${isPressed ? ' scale-95' : ''}`}
-      >
-        {selected ? 'Dodano' : 'Dodaj do grupy'}
-      </button>
-    </div>
-  );
-});
-
-type GroupRowProps = {
-  group: Group;
-  unread: number;
-  unreadInvite: boolean;
-  isMenuOpen: boolean;
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  onOpenChat: (id: string, name: string, chatId: string) => void;
-  onOpenMenu: (id: string) => void;
-  onAction: (id: string, action: 'rename' | 'invite' | 'remove' | 'leave') => void;
-  onCloseMenu: () => void;
-};
-
-const GroupRow = React.memo(function GroupRow({
-  group,
-  unread,
-  unreadInvite,
-  isMenuOpen,
-  menuRef,
-  onOpenChat,
-  onOpenMenu,
-  onAction,
-  onCloseMenu,
-}: GroupRowProps) {
-  const chatId = `group:${group.id}`;
-  const [isPressed, setIsPressed] = useState(false);
-  const canManage = group.role === 'admin';
-
-  const handleClick = () => {
-    setIsPressed(true);
-    setTimeout(() => setIsPressed(false), 125);
-    onOpenChat(group.id, group.name, chatId);
-  };
-
-  return (
-    <motion.li
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.25 }}
-      layout
-      className="py-0.5 m-0 relative"
-    >
-      <div
-        className="w-full text-left rounded-lg transition group bg-transparent hover:bg-indigo-400/30 transition-transform duration-100"
-        style={{ cursor: 'pointer' }}
-        onClick={handleClick}
-        tabIndex={0}
-        role="button"
-        aria-pressed={isPressed}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-white/8 flex items-center justify-center text-sm font-semibold text-white relative">
-            {(group.name || '??').slice(0, 2).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="text-sm truncate transition-colors duration-200 text-white group-hover:text-indigo-100 group-focus:text-indigo-50">
-                {group.name}
-              </div>
-              {unreadInvite && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/90 text-[10px] font-semibold text-white">
-                  NOWA
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-white/60 truncate">ID: {group.id}</div>
-            <div className="text-xs text-white/40">{group.memberCount} członków</div>
-          </div>
-          {unread > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white min-w-[1.5rem] h-5 transition-all duration-300 animate-fadein">
-              {unread}
-            </span>
-          )}
-        </div>
-      </div>
-      <button
-        type="button"
-        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity ml-2 rounded-full text-white hover:bg-white/10 focus:bg-white/20 flex items-center justify-center w-7 h-7 p-0 absolute top-1 right-1"
-        tabIndex={-1}
-        aria-label="Więcej akcji"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenMenu(group.id);
-        }}
-      >
-        <span className="text-base font-bold select-none flex items-center justify-center w-4 h-4">...</span>
-      </button>
-      {isMenuOpen && (
-        <div
-          ref={menuRef}
-          className="absolute right-2 top-10 z-[9999] w-40 py-1 px-1 text-xs rounded-md shadow-lg border transition-all duration-200 ease-out origin-top-right bg-white text-gray-900 border-white/10 dark:bg-gray-900 dark:text-white dark:border-gray-700"
-          style={{
-            minWidth: 120,
-            maxWidth: 180,
-            maxHeight: 160,
-            overflow: 'auto',
-            transform: isMenuOpen ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-8px)',
-            opacity: isMenuOpen ? 1 : 0,
-            pointerEvents: isMenuOpen ? 'auto' : 'none',
-          }}
-        >
-          <button
-            type="button"
-            className={`w-full text-left px-1.5 py-1 rounded flex items-center gap-2 transition-colors ${
-              canManage ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-400 cursor-not-allowed'
-            }`}
-            disabled={!canManage}
-            onClick={() => {
-              onCloseMenu();
-              if (canManage) onAction(group.id, 'rename');
-            }}
-          >
-            <span>Zmień nazwę</span>
-          </button>
-          <button
-            type="button"
-            className={`w-full text-left px-1.5 py-1 rounded flex items-center gap-2 transition-colors ${
-              canManage ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-400 cursor-not-allowed'
-            }`}
-            disabled={!canManage}
-            onClick={() => {
-              onCloseMenu();
-              if (canManage) onAction(group.id, 'invite');
-            }}
-          >
-            <span>Dodaj członka</span>
-          </button>
-          <button
-            type="button"
-            className={`w-full text-left px-1.5 py-1 rounded flex items-center gap-2 transition-colors ${
-              canManage ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-400 cursor-not-allowed'
-            }`}
-            disabled={!canManage}
-            onClick={() => {
-              onCloseMenu();
-              if (canManage) onAction(group.id, 'remove');
-            }}
-          >
-            <span>Usuń członka</span>
-          </button>
-          <button
-            type="button"
-            className="w-full text-left px-1.5 py-1 rounded flex items-center gap-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
-            onClick={() => {
-              onCloseMenu();
-              onAction(group.id, 'leave');
-            }}
-          >
-            <span>Opuść grupę</span>
-          </button>
-        </div>
-      )}
-    </motion.li>
-  );
-});
-
+import {
+  ActionIconButton,
+  BackButton,
+  DodajZnajomegoButton,
+  FriendRow,
+  FriendSelectRow,
+  GroupRow,
+  NowaGrupaButton,
+  SearchInput,
+  SectionTabButton,
+  TooltipPortal,
+} from './RightSidebarParts';
 export default function RightSidebar() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [openMenuFriendId, setOpenMenuFriendId] = useState<string | null>(null);
@@ -406,8 +28,6 @@ export default function RightSidebar() {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-  const invitesBtnRef = useRef<HTMLButtonElement | null>(null);
-  const addBtnRef = useRef<HTMLButtonElement | null>(null);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupName, setCreateGroupName] = useState('');
   const [createGroupFriendIds, setCreateGroupFriendIds] = useState<string[]>([]);
@@ -460,7 +80,10 @@ export default function RightSidebar() {
   // All hooks/state at the top
   const { openChat, openGroupChat, chats, unreadCounts, resetUnread } = useChat();
   const [active, setActive] = useState<'friends' | 'groups'>('friends');
+  const [inviteTabRead, setInviteTabRead] = useState(false);
+  const [groupTabRead, setGroupTabRead] = useState(false);
   const [panel, setPanel] = useState<'none' | 'add' | 'invites'>('none');
+  const [groupQuery, setGroupQuery] = useState('');
   const [query, setQuery] = useState('');
   const { friends, friendsLoading, friendsError, pendingInvites, unreadInviteCount, markInvitesRead, sendInvite, getRelationState, unfriend } = useFriendContext();
   const {
@@ -477,7 +100,6 @@ export default function RightSidebar() {
     markInvitesRead: markGroupInvitesRead,
     markGroupInviteNotificationsRead,
     markGroupMessagesRead,
-    markAllNotificationsRead,
     createGroup,
     inviteToGroup,
     acceptInvite,
@@ -486,18 +108,20 @@ export default function RightSidebar() {
     leaveGroup,
     renameGroup,
     fetchMembers,
-    refreshInvites,
   } = useGroupContext();
+
+  // Reset tab notification when new invite arrives
+  useEffect(() => {
+    if (unreadInviteCount > 0) setInviteTabRead(false);
+  }, [unreadInviteCount]);
+  useEffect(() => {
+    if (unreadGroupInviteCount > 0) setGroupTabRead(false);
+  }, [unreadGroupInviteCount]);
 
   useEffect(() => {
     if (panel !== 'invites') return;
     markInvitesRead();
   }, [panel, pendingInvites, markInvitesRead]);
-
-  useEffect(() => {
-    if (active !== 'groups') return;
-    markAllNotificationsRead();
-  }, [active, markAllNotificationsRead]);
 
   useEffect(() => {
     if (active !== 'groups' && groupPanel !== 'none') {
@@ -508,8 +132,7 @@ export default function RightSidebar() {
   useEffect(() => {
     if (groupPanel !== 'invites') return;
     markGroupInviteNotificationsRead();
-    refreshInvites();
-  }, [groupPanel, markGroupInviteNotificationsRead, refreshInvites]);
+  }, [groupPanel, markGroupInviteNotificationsRead]);
 
   const displayedFriends = panel === 'none' && query.trim().length > 0
     ? friends.filter((f: Friend) =>
@@ -519,6 +142,9 @@ export default function RightSidebar() {
     : friends;
 
   const groupUnreadTotal = unreadGroupInviteCount + Object.values(unreadMessageCounts).reduce((sum, v) => sum + v, 0);
+  const showFriendsSpinner = friendsLoading && friends.length === 0;
+  const showGroupsSpinner = groupsLoading && groups.length === 0;
+  const showGroupInvitesSpinner = invitesLoading && groupInvites.length === 0;
 
   function getChatId(kind: 'friend' | 'group', peerId: string) {
     return `${kind}:${peerId}`;
@@ -899,31 +525,39 @@ export default function RightSidebar() {
       {renameGroupModal}
       {removeMemberModal}
       {leaveGroupModal}
+      <TooltipPortal tooltip={tooltip} />
       <nav className="flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl overflow-visible">
         
         <div className="sticky top-0 z-20 -mx-4 px-4 pb-2 bg-transparent">
           <div className="flex w-full justify-center">
             <div role="tablist" className="inline-flex w-auto gap-2 bg-white/5 rounded-full p-1 shadow-inner border border-white/10">
-              <button
-                onClick={() => setActive('friends')}
-                className={`px-4 py-2 text-sm rounded-full transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 ${active === 'friends' ? 'bg-indigo-500/80 text-white' : 'text-white/70 hover:bg-white/10'}`}
-                style={{ minWidth: 100 }}
+              <SectionTabButton
+                active={active === 'friends'}
+                label="Znajomi"
+                icon={<UserIcon className="w-5 h-5" />}
+                showDot={unreadInviteCount > 0 && !inviteTabRead && active !== 'friends'}
+                onClick={() => {
+                  setActive('friends');
+                  setPanel('none');
+                  setInviteTabRead(true);
+                }}
+              />
+              <SectionTabButton
+                active={active === 'groups'}
+                label="Grupy"
+                icon={<UserGroupIcon className="w-5 h-5" />}
+                showDot={unreadGroupInviteCount > 0 && !groupTabRead && active !== 'groups'}
+                onClick={() => {
+                  setActive('groups');
+                  setGroupTabRead(true);
+                }}
               >
-                <UserIcon className="w-4 h-4" /> Znajomi
-              </button>
-              <button
-                onClick={() => setActive('groups')}
-                className={`px-4 py-2 text-sm rounded-full transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 ${active === 'groups' ? 'bg-indigo-500/80 text-white' : 'text-white/70 hover:bg-white/10'}`}
-                style={{ minWidth: 100 }}
-              >
-                <UserGroupIcon className="w-4 h-4" />
-                <span>Grupy</span>
                 {groupUnreadTotal > 0 && (
                   <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-500 text-white min-w-[1.25rem]">
                     {groupUnreadTotal}
                   </span>
                 )}
-              </button>
+              </SectionTabButton>
             </div>
           </div>
           <div className="pt-3 border-b border-white/10" />
@@ -931,77 +565,43 @@ export default function RightSidebar() {
 
         <div className="flex-1 overflow-y-auto px-1 py-2" style={{ position: 'relative', height: 420 }}>
           <div className="relative w-full h-[420px]">
-            <div className="absolute inset-0 h-[420px]" style={{ opacity: active === 'friends' ? 1 : 0, pointerEvents: active === 'friends' ? 'auto' : 'none' }}>
-              {active === 'friends' && (
-                <div className="h-full overflow-y-auto">
-                  <div className="flex items-center gap-2 mb-3 mt-1">
+            <div
+              className="absolute inset-0 h-[420px]"
+              style={{
+                opacity: active === 'friends' ? 1 : 0,
+                visibility: active === 'friends' ? 'visible' : 'hidden',
+                pointerEvents: active === 'friends' ? 'auto' : 'none',
+              }}
+            >
+              <div className="h-full overflow-y-auto">
+                    <div className="flex items-center gap-2 mb-3 mt-1">
                     <div className="relative flex-1 min-w-0">
-                      <input
+                      <SearchInput
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
+                        onChange={setQuery}
                         placeholder="Szukaj znajomego"
-                        className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white text-xs placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ml-[2px]"
                       />
-                      <MagnifyingGlassIcon className="w-4 h-4 absolute right-3 top-2.5 text-white/60" />
                     </div>
-                    <button
-                      type="button"
-                      ref={invitesBtnRef}
+                    <ActionIconButton
+                      ariaLabel="Zaproszenia do znajomych"
+                      tooltipText="Zaproszenia do znajomych"
+                      setTooltip={setTooltip}
                       onClick={() => {
                         const next = panel === 'invites' ? 'none' : 'invites';
                         setPanel(next);
-                        if (next === 'invites') {
-                          markInvitesRead();
-                        }
+                        if (unreadInviteCount > 0) markInvitesRead();
                       }}
-                      aria-label="Zaproszenia do znajomych"
-                      className="relative inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/6 hover:bg-white/10 text-white transition-colors focus:outline-none border-none shadow-none"
-                      onMouseEnter={e => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setTooltip({ text: 'Zaproszenia do znajomych', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
-                      }}
-                      onMouseLeave={() => setTooltip(null)}
                     >
-                      
                       <FriendInvitesIcon count={unreadInviteCount} />
-                    </button>
-                    <button
-                      type="button"
-                      ref={addBtnRef}
+                    </ActionIconButton>
+                    <ActionIconButton
+                      ariaLabel="Dodaj znajomego"
+                      tooltipText="Dodaj znajomego"
+                      setTooltip={setTooltip}
                       onClick={() => setPanel((p) => p === 'add' ? 'none' : 'add')}
-                      aria-label="Dodaj znajomych"
-                      className="relative inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/6 hover:bg-white/10 text-white transition-colors focus:outline-none border-none shadow-none"
-                      onMouseEnter={e => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setTooltip({ text: 'Dodaj znajomych', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
-                      }}
-                      onMouseLeave={() => setTooltip(null)}
                     >
-                      <UserPlusIcon className="w-4 h-4" />
-                    </button>
-                          
-                          {tooltip && createPortal(
-                            <span
-                              style={{
-                                position: 'fixed',
-                                left: tooltip.x,
-                                top: tooltip.y,
-                                transform: 'translate(-50%, 0)',
-                                zIndex: 9999,
-                                background: 'rgba(0,0,0,0.92)',
-                                color: 'white',
-                                fontSize: '12px',
-                                borderRadius: '6px',
-                                padding: '4px 10px',
-                                pointerEvents: 'none',
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 2px 8px 0 rgba(0,0,0,0.18)'
-                              }}
-                            >
-                              {tooltip.text}
-                            </span>,
-                            document.body
-                          )}
+                      <UserPlusIcon className="w-5 h-5" />
+                    </ActionIconButton>
                   </div>
 
                   {panel === 'add' && (
@@ -1076,7 +676,7 @@ export default function RightSidebar() {
                     <div className="rounded-xl bg-white/4">
                       <div className="flex items-center mb-2">
                         <BackButton onClick={() => setPanel('none')} />
-                        <strong className="text-white">Zaproszenia</strong>
+                        <strong className="text-white">Zaproszenia do znajomych</strong>
                       </div>
                       <FriendRequests setTooltip={setTooltip} />
                     </div>
@@ -1085,36 +685,28 @@ export default function RightSidebar() {
                   {panel === 'none' && (
                     <div>
                       <div className="mb-2 text-sm text-white/60">Lista znajomych</div>
-                      {friendsLoading ? (
+                      {showFriendsSpinner ? (
                         <div className="flex justify-center items-center h-40">
                           <span className="inline-block animate-spin rounded-full border-4 border-indigo-400 border-t-transparent dark:border-indigo-300 dark:border-t-transparent w-8 h-8" />
                         </div>
                       ) : friendsError ? (
                         <div className="text-xs text-red-400">{friendsError}</div>
-                      ) : displayedFriends.length === 0 && showEmptyButton ? (
+                      ) : displayedFriends.length === 0 && showEmptyButton && !friendsLoading ? (
                         <div className="flex flex-col items-center justify-center h-40">
-                          <AnimatePresence>
-                            {showEmptyButton && (
-                              <motion.div
-                                initial={{ opacity: 0, y: 16 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 16 }}
-                                transition={{ duration: 0.6, ease: 'easeOut' }}
-                              >
-                                <DodajZnajomegoButton onClick={() => setPanel('add')} />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                          {showEmptyButton && (
+                            <div>
+                              <DodajZnajomegoButton onClick={() => setPanel('add')} />
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <AnimatePresence>
-                          <motion.ul
-                            className="space-y-0"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.4 }}
-                          >
+                        <>
+                          {friendsLoading && friends.length > 0 && (
+                            <div className="flex justify-center items-center py-2">
+                              <span className="inline-block animate-spin rounded-full border-2 border-indigo-300 border-t-transparent w-5 h-5" />
+                            </div>
+                          )}
+                          <ul className="space-y-0">
                             {displayedFriends.map((f) => {
                               const chatId = getChatId('friend', f.id);
                               const unread = unreadCounts[chatId] || 0;
@@ -1137,65 +729,92 @@ export default function RightSidebar() {
                                 />
                               );
                             })}
-                          </motion.ul>
-                        </AnimatePresence>
+                          </ul>
+                        </>
                       )}
                     </div>
                   )}
-                </div>
-              )}
+              </div>
             </div>
-            <div className="absolute inset-0 transition-opacity duration-200 h-[420px]" style={{ opacity: active === 'groups' ? 1 : 0, pointerEvents: active === 'groups' ? 'auto' : 'none' }}>
-              {active === 'groups' && (
-                <div className="h-[420px] overflow-y-auto">
-                  <div className="flex items-center justify-between mb-3 mt-1">
-                    <div className="text-sm text-white/60">Twoje grupy</div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
+            <div
+              className="absolute inset-0 h-[420px]"
+              style={{
+                opacity: active === 'groups' ? 1 : 0,
+                visibility: active === 'groups' ? 'visible' : 'hidden',
+                pointerEvents: active === 'groups' ? 'auto' : 'none',
+              }}
+            >
+              <div className="h-[420px] overflow-y-auto">
+                <div className="flex items-center gap-2 mb-3 mt-1">
+                  <div className="relative flex-1 min-w-0">
+                    <SearchInput
+                      value={groupQuery}
+                      onChange={setGroupQuery}
+                      placeholder="Szukaj grupy"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <ActionIconButton
+                        ariaLabel="Zaproszenia do grup"
+                        tooltipText="Zaproszenia do grup"
+                        setTooltip={setTooltip}
                         onClick={() => {
                           const next = groupPanel === 'invites' ? 'none' : 'invites';
                           setGroupPanel(next);
-                          if (next === 'invites') {
-                            markGroupInviteNotificationsRead();
-                            refreshInvites();
-                          }
+                          if (unreadGroupInviteCount > 0) markGroupInviteNotificationsRead();
                         }}
-                        className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-white/10 hover:bg-white/20 transition"
                       >
-                        <span>Zaproszenia</span>
+                        <InboxIcon className="w-5 h-5" />
                         {unreadGroupInviteCount > 0 && (
                           <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-500 text-white min-w-[1.25rem]">
                             {unreadGroupInviteCount}
                           </span>
                         )}
-                      </button>
-                      <button
-                        type="button"
+                      </ActionIconButton>
+                      <ActionIconButton
+                        ariaLabel="Utwórz nową grupę"
+                        tooltipText="Utwórz nową grupę"
+                        setTooltip={setTooltip}
                         onClick={() => setCreateGroupOpen(true)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-emerald-500/80 hover:bg-emerald-500 transition"
                       >
-                        <UserGroupIcon className="w-4 h-4" />
-                        <span>Nowa grupa</span>
-                      </button>
-                    </div>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                          <span style={{ position: 'relative', display: 'inline-block', width: 20, height: 20 }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ position: 'absolute', right: -2, bottom: -2, zIndex: 1 }}>
+                              <circle cx="6" cy="6" r="6" fill="#22c55e" />
+                              <path d="M6 3.5v5M3.5 6h5" stroke="#fff" strokeWidth="1.2" strokeLinecap="round"/>
+                            </svg>
+                          </span>
+                        </span>
+                      </ActionIconButton>
                   </div>
+                </div>
                   {groupPanel === 'invites' ? (
                     <div className="rounded-xl bg-white/4">
                       <div className="flex items-center mb-2">
                         <BackButton onClick={() => setGroupPanel('none')} />
                         <strong className="text-white">Zaproszenia do grup</strong>
                       </div>
-                      {invitesLoading ? (
+                      {showGroupInvitesSpinner ? (
                         <div className="flex justify-center items-center h-40">
                           <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" />
                         </div>
                       ) : invitesError ? (
                         <div className="text-xs text-red-400">{invitesError}</div>
                       ) : groupInvites.length === 0 ? (
-                        <div className="text-xs text-white/60 px-2 py-3">Brak zaproszeń.</div>
+                        <div className="text-xs text-white/60 px-2 py-3">Brak zaproszeń</div>
                       ) : (
                         <div className="space-y-2 max-h-72 overflow-y-auto">
+                          {invitesLoading && groupInvites.length > 0 && (
+                            <div className="flex justify-center items-center py-1">
+                              <span className="inline-block animate-spin rounded-full border-2 border-emerald-300 border-t-transparent w-5 h-5" />
+                            </div>
+                          )}
                           {groupInvites.map((inv: GroupInvite) => (
                             <div key={inv.id} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
                               <div className="min-w-0">
@@ -1233,67 +852,61 @@ export default function RightSidebar() {
                         </div>
                       )}
                     </div>
-                  ) : groupsLoading ? (
-                    <div className="flex justify-center items-center h-40">
-                      <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" />
-                    </div>
-                  ) : groupsError ? (
-                    <div className="text-xs text-red-400 mt-2">{groupsError}</div>
-                  ) : groups.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-40">
-                      <NowaGrupaButton onClick={() => setCreateGroupOpen(true)} />
-                    </div>
                   ) : (
-                    <AnimatePresence>
-                      <motion.ul
-                        className="space-y-0"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.4 }}
-                      >
-                        {groups.map((g) => {
-                          const chatId = getChatId('group', g.id);
-                          const unread = unreadMessageCounts[g.id] || 0;
-                          return (
-                            <GroupRow
-                              key={g.id}
-                              group={g}
-                              unread={unread}
-                              unreadInvite={isInviteUnread(g.id)}
-                              isMenuOpen={openMenuGroupId === g.id}
-                              menuRef={groupMenuRef}
-                              onOpenChat={handleOpenGroupChat}
-                              onOpenMenu={handleOpenGroupMenu}
-                              onAction={handleGroupAction}
-                              onCloseMenu={handleCloseGroupMenu}
-                            />
-                          );
-                        })}
-                      </motion.ul>
-                    </AnimatePresence>
+                    <div>
+                      <div className="mb-2 text-sm text-white/60">Lista grup</div>
+                      {showGroupsSpinner ? (
+                        <div className="flex justify-center items-center h-40">
+                          <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" />
+                        </div>
+                      ) : groupsError ? (
+                        <div className="text-xs text-red-400 mt-2">{groupsError}</div>
+                      ) : groups.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-40">
+                          <NowaGrupaButton onClick={() => setCreateGroupOpen(true)} />
+                        </div>
+                      ) : (
+                        <>
+                          {groupsLoading && groups.length > 0 && (
+                            <div className="flex justify-center items-center py-2">
+                              <span className="inline-block animate-spin rounded-full border-2 border-emerald-300 border-t-transparent w-5 h-5" />
+                            </div>
+                          )}
+                          <ul className="space-y-0">
+                            {groups
+                              .filter((g) =>
+                                groupQuery.trim().length === 0
+                                  ? true
+                                  : (g.name?.toLowerCase() ?? '').includes(groupQuery.trim().toLowerCase())
+                              )
+                              .map((g) => {
+                                const chatId = getChatId('group', g.id);
+                                const unread = unreadMessageCounts[g.id] || 0;
+                                return (
+                                  <GroupRow
+                                    key={g.id}
+                                    group={g}
+                                    unread={unread}
+                                    unreadInvite={isInviteUnread(g.id)}
+                                    isMenuOpen={openMenuGroupId === g.id}
+                                    menuRef={groupMenuRef}
+                                    onOpenChat={handleOpenGroupChat}
+                                    onOpenMenu={handleOpenGroupMenu}
+                                    onAction={handleGroupAction}
+                                    onCloseMenu={handleCloseGroupMenu}
+                                  />
+                                );
+                              })}
+                          </ul>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
       </nav>
     </>
-  );
-}
-
-function GradientChevronLeftIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width={20} height={20} {...props}>
-      <defs>
-        <linearGradient id="chevron-gradient" x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#818cf8" />
-          <stop offset="0.5" stopColor="#60a5fa" />
-          <stop offset="1" stopColor="#a78bfa" />
-        </linearGradient>
-      </defs>
-      <ChevronLeftSolid fill="url(#chevron-gradient)" width={20} height={20} />
-    </svg>
   );
 }
