@@ -212,9 +212,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
   ];
 
   const groupsNav = [
-    { href: '/dashboard/groups/create', label: 'Create Group' },
-    { href: '/dashboard/groups/search', label: 'Search Groups' },
-    { href: '/dashboard/groups', label: 'My Groups' },
+    { href: '/dashboard/groups', label: 'Grupy' },
   ];
 
   return (

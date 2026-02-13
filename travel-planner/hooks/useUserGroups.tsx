@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getBrowserSupabase } from '../lib/supabaseClient';
 
 export type UserGroup = {
   id: string;
   name: string;
-  slug: string;
+  slug?: string | null;
   description?: string | null;
   is_private: boolean;
+  memberCount: number;
   role: 'member' | 'admin';
 };
 
@@ -24,37 +24,20 @@ export default function useUserGroups() {
       setLoading(true);
       setError(null);
       try {
-        const supabase = getBrowserSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
-        const userId = user?.id ?? null;
-        if (!userId) {
-          if (mounted) setGroups([]);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('group_members')
-          .select('role, groups(id, name, slug, description, is_private)')
-          .eq('user_id', userId);
-
-        if (error) throw error;
-
-        const rows = (data ?? []) as Array<any>;
-        const mapped: UserGroup[] = rows
-          .map((r) => {
-            const g = r.groups ?? {};
-            if (!g || !g.id) return null;
-            return {
+        const res = await fetch('/api/groups/list', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch groups');
+        const data = await res.json();
+        const mapped: UserGroup[] = Array.isArray(data)
+          ? data.map((g: any) => ({
               id: String(g.id),
               name: String(g.name ?? ''),
-              slug: String(g.slug ?? ''),
+              slug: g.slug ?? null,
               description: g.description ?? null,
-              is_private: Boolean(g.is_private),
-              role: r.role === 'admin' ? 'admin' : 'member',
-            } as UserGroup;
-          })
-          .filter(Boolean) as UserGroup[];
-
+              is_private: Boolean(g.isPrivate ?? g.is_private),
+              memberCount: Number(g.memberCount ?? g.member_count ?? 0),
+              role: g.role === 'admin' ? 'admin' : 'member',
+            }))
+          : [];
         if (mounted) setGroups(mapped);
       } catch (err: any) {
         if (mounted) setError(err instanceof Error ? err : new Error(String(err)));

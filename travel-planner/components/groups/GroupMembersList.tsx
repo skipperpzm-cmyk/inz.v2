@@ -94,29 +94,29 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
 
   const isMember = members.some((m) => m.id === myUserId);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePublicId, setInvitePublicId] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
 
-  function validateEmail(e: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  function validatePublicId(value: string) {
+    return /^\d{8}$/.test(value);
   }
 
   async function handleInvite(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!validateEmail(inviteEmail)) {
-      try { toast.push({ type: 'error', message: 'Invalid email' }); } catch (er) { }
+    if (!validatePublicId(invitePublicId)) {
+      try { toast.push({ type: 'error', message: 'Publiczne ID musi mieć 8 cyfr' }); } catch (er) { }
       return;
     }
     setInviteLoading(true);
     try {
-      const res = await fetch(`/api/groups/${encodeURIComponent(groupSlug)}/members/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inviteEmail.trim().toLowerCase() }) });
+      const res = await fetch(`/api/groups/${encodeURIComponent(groupSlug)}/members/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publicId: invitePublicId.trim() }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.error) throw new Error(json.error || 'Failed to invite member');
       const member = json.member;
       if (member) {
         setMembers((m) => [...m, { id: member.id, username: member.username, full_name: member.full_name, avatar_url: member.avatar_url, role: member.role }]);
         try { toast.push({ type: 'success', message: 'Member added to group' }); } catch (er) { }
-        setInviteEmail('');
+        setInvitePublicId('');
         setInviteModalOpen(false);
       }
     } catch (err: any) {
@@ -154,14 +154,14 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
       </div>
 
       {/* Invite modal for admins */}
-      <Modal open={inviteModalOpen} onClose={() => setInviteModalOpen(false)} title="Invite to group">
-        <div className="text-slate-300 mb-3">Enter the email address of the user you want to add to this group.</div>
+      <Modal open={inviteModalOpen} onClose={() => setInviteModalOpen(false)} title="Zaproś do grupy">
+        <div className="text-slate-300 mb-3">Wpisz publiczne ID znajomego, którego chcesz dodać.</div>
         <form onSubmit={handleInvite} className="flex flex-col gap-3">
           <input
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="email@example.com"
-            aria-label="Email address"
+            value={invitePublicId}
+            onChange={(e) => setInvitePublicId(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            placeholder="Publiczne ID"
+            aria-label="Publiczne ID"
             className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white"
           />
           <div className="flex justify-end gap-2">

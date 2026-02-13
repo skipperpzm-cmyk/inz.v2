@@ -24,13 +24,13 @@ export default function GroupsListClient() {
   return (
     <div className="grid gap-4">
       {groups.map((g) => (
-        <Link key={g.id} href={`/dashboard/groups/${encodeURIComponent(g.slug)}`} className="block p-4 bg-white/4 rounded-2xl hover:bg-white/6 transition">
+        <Link key={g.id} href={`/dashboard/groups/${encodeURIComponent(g.slug ?? g.id)}`} className="block p-4 bg-white/4 rounded-2xl hover:bg-white/6 transition">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="text-white font-medium">{g.name}</div>
-              <div className="text-sm text-slate-400 mt-1">{g.description ?? 'Brak opisu'}</div>
+            <div className="min-w-0">
+              <div className="text-white font-medium truncate">{g.name}</div>
+              <div className="text-xs text-slate-400 mt-1 truncate">ID: {g.id}</div>
             </div>
-            <div className="text-xs text-slate-300 ml-4">{g.is_private ? 'Prywatna' : 'Publiczna'}</div>
+            <div className="text-xs text-slate-300 ml-4">{g.memberCount} członków</div>
           </div>
         </Link>
       ))}

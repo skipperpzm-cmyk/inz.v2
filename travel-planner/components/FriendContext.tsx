@@ -100,6 +100,7 @@ export function FriendProvider({ children }: { children: ReactNode }) {
     const supabase = getBrowserSupabase();
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
+    let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
       try {
@@ -300,24 +301,29 @@ export function FriendProvider({ children }: { children: ReactNode }) {
     const supabase = getBrowserSupabase();
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
+    let refreshTimer: NodeJS.Timeout | null = null;
 
-    (async () => {
+    const refreshRealtimeToken = async () => {
       try {
         const res = await fetch('/api/supabase/realtime-token', { credentials: 'include' });
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const data = await res.json();
-        if (cancelled) return;
+        if (cancelled) return false;
         if (typeof data?.token === 'string') {
           supabase.realtime.setAuth(data.token);
-        } else {
-          return;
+          return true;
         }
+        return false;
       } catch {
-        return;
+        return false;
       }
+    };
 
-      if (cancelled) return;
-      channel = supabase.channel(`friend-invites:${currentUserId}`) 
+    (async () => {
+      const authed = await refreshRealtimeToken();
+      if (!authed || cancelled) return;
+
+      channel = supabase.channel(`friend-invites:${currentUserId}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
@@ -335,10 +341,16 @@ export function FriendProvider({ children }: { children: ReactNode }) {
           handleInviteRealtime(payload);
         })
         .subscribe();
+
+      // Refresh JWT before it expires to keep realtime subscriptions alive.
+      refreshTimer = setInterval(() => {
+        void refreshRealtimeToken();
+      }, 45 * 60 * 1000);
     })();
 
     return () => {
       cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
       if (channel) supabase.removeChannel(channel);
     };
   }, [currentUserId]);

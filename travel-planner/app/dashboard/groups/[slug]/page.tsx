@@ -11,6 +11,7 @@ type Member = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  public_id?: string | null;
   role: 'member' | 'admin';
 };
 
@@ -41,7 +42,7 @@ export default async function GroupPage({ params }: { params: { slug: string } }
 
   // Fetch members JOIN profiles
   const membersRes = await (db as any).execute(
-    `select gm.user_id as id, gm.role, p.username, p.full_name, p.avatar_url
+    `select gm.user_id as id, gm.role, p.username, p.full_name, p.avatar_url, p.public_id
      from public.group_members gm
      join public.profiles p on p.id = gm.user_id
      where gm.group_id = $1
@@ -54,6 +55,7 @@ export default async function GroupPage({ params }: { params: { slug: string } }
     username: r.username,
     full_name: r.full_name,
     avatar_url: r.avatar_url,
+    public_id: r.public_id,
     role: r.role === 'admin' ? 'admin' : 'member',
   }));
 

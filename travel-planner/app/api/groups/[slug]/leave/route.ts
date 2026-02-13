@@ -2,6 +2,12 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { requireDb } from '@/src/db/db';
 
+async function findGroup(db: any, key: string) {
+  const res = await (db as any).execute('select id from public.groups where id::text = $1 or slug = $1 limit 1', [key]);
+  const rows = (res as any).rows ?? res;
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -12,9 +18,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
 
   try {
     const db = requireDb();
-    const groupRes = await (db as any).execute('select id from public.groups where slug = $1 limit 1', [slug]);
-    const groupRows = (groupRes as any).rows ?? groupRes;
-    const group = Array.isArray(groupRows) && groupRows.length ? groupRows[0] : null;
+    const group = await findGroup(db, slug);
     if (!group) return NextResponse.json({ error: 'Group not found' }, { status: 404 });
     // Check if user is admin and whether they are the last admin
     const roleRes = await (db as any).execute('select role from public.group_members where group_id = $1 and user_id = $2 limit 1', [group.id, user.id]);
