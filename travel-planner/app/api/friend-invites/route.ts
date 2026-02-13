@@ -47,6 +47,7 @@ export async function POST(req: Request) {
         if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
         toUserId = profile.id;
       } catch (err) {
+        console.error('Failed to resolve public id:', err);
         return NextResponse.json({ error: 'Failed to resolve public id' }, { status: 500 });
       }
     }
@@ -58,12 +59,14 @@ export async function POST(req: Request) {
       const target = await getUserById(String(toUserId));
       if (!target) return NextResponse.json({ error: 'Target user not found' }, { status: 404 });
     } catch (err) {
+      console.error('Failed to verify target user:', err);
       return NextResponse.json({ error: 'Failed to verify target user' }, { status: 500 });
     }
 
     const created = await createInvite(user.id, String(toUserId));
     return NextResponse.json(created);
   } catch (err: any) {
+    console.error('API /api/friend-invites error:', err);
     return NextResponse.json({ error: err?.message ?? 'Failed to create invite' }, { status: 500 });
   }
 }
