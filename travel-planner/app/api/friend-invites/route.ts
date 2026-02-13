@@ -67,9 +67,6 @@ export async function POST(req: Request) {
     return NextResponse.json(created);
   } catch (err: any) {
     console.error('API /api/friend-invites error:', err);
-    return NextResponse.json({
-      error: err?.message ?? 'Failed to create invite',
-      details: err?.stack ?? String(err)
-    }, { status: 500 });
+    return NextResponse.json({ error: err?.message ?? 'Failed to create invite' }, { status: 500 });
   }
 }
