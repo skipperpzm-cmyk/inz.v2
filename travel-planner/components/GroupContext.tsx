@@ -3,16 +3,18 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { getBrowserSupabase } from "../lib/supabaseClient";
 
-export type GroupAction = "rename" | "invite" | "remove" | "leave";
+export type GroupAction = "rename" | "invite" | "remove" | "leave" | "manage";
 
 export type Group = {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   slug?: string | null;
   description?: string | null;
   isPrivate: boolean;
   memberCount: number;
   role: "member" | "admin";
+  createdBy?: string;
 };
 
 export type Member = {
@@ -60,6 +62,7 @@ type GroupContextValue = {
   removeMember: (groupId: string, userId: string) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
   renameGroup: (groupId: string, name: string) => Promise<void>;
+  updateGroupAvatar: (groupId: string, dataUrl: string) => Promise<string>;
   fetchMembers: (groupId: string) => Promise<Member[]>;
 };
 
@@ -221,6 +224,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     const optimistic: Group = {
       id: tempId,
       name: trimmed,
+        avatarUrl: null,
       slug: null,
       description: null,
       isPrivate: true,
@@ -243,6 +247,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       const created: Group = {
         id: String(group.id),
         name: String(group.name ?? trimmed),
+        avatarUrl: group.avatar_url ?? null,
         slug: group.slug ?? null,
         description: group.description ?? null,
         isPrivate: Boolean(group.is_private),
@@ -282,6 +287,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
         const optimistic: Group = {
           id: groupId,
           name: groupName || "Nowa grupa",
+          avatarUrl: null,
           slug: null,
           description: null,
           isPrivate: true,
@@ -355,6 +361,21 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.error) throw new Error(json.error || "Nie udało się zmienić nazwy");
     setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, name: trimmed } : g)));
+  }, []);
+
+  const updateGroupAvatar = useCallback(async (groupId: string, dataUrl: string) => {
+    if (!dataUrl) throw new Error("Brak obrazu");
+    const res = await fetch(`/api/groups/${encodeURIComponent(groupId)}/avatar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) throw new Error(json.error || "Nie udało się zapisać awatara");
+    const avatarUrl = String(json.avatarUrl ?? "");
+    if (!avatarUrl) throw new Error("Brak awatara w odpowiedzi");
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, avatarUrl } : g)));
+    return avatarUrl;
   }, []);
 
   const fetchMembers = useCallback(async (groupId: string) => {
@@ -644,6 +665,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       removeMember,
       leaveGroup,
       renameGroup,
+      updateGroupAvatar,
       fetchMembers,
     }),
     [
@@ -671,6 +693,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       removeMember,
       leaveGroup,
       renameGroup,
+      updateGroupAvatar,
       fetchMembers,
     ]
   );

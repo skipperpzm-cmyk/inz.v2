@@ -162,7 +162,7 @@ export function FriendProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentUserId) return;
     const onUnload = () => {
-      fetch('/api/user/offline', { method: 'POST', keepalive: true });
+      navigator.sendBeacon('/api/user/offline');
     };
     window.addEventListener('beforeunload', onUnload);
     return () => {

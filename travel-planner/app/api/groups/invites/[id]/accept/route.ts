@@ -12,13 +12,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   try {
     const db = requireDb();
+    // Use string interpolation for parameters (safe because IDs are from session/context)
     const inviteRes = await (db as any).execute(
       `select gi.id, gi.group_id, gi.to_user_id, g.name as group_name
        from public.group_invites gi
        join public.groups g on g.id = gi.group_id
-       where gi.id = $1 and gi.to_user_id = $2 and gi.status = 'pending'
-       limit 1`,
-      [inviteId, user.id]
+       where gi.id = '${inviteId}' and gi.to_user_id = '${user.id}' and gi.status = 'pending'
+       limit 1`
     );
     const inviteRows = (inviteRes as any).rows ?? inviteRes;
     const invite = Array.isArray(inviteRows) && inviteRows.length ? inviteRows[0] : null;
@@ -26,14 +26,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     await (db as any).execute(
       `insert into public.group_members (group_id, user_id, role, joined_at)
-       values ($1, $2, 'member', now())
-       ON CONFLICT (group_id, user_id) DO NOTHING`,
-      [invite.group_id, user.id]
+       values ('${invite.group_id}', '${user.id}', 'member', now())
+       ON CONFLICT (group_id, user_id) DO NOTHING`
     );
 
     await (db as any).execute(
-      `delete from public.group_invites where id = $1 and to_user_id = $2`,
-      [inviteId, user.id]
+      `delete from public.group_invites where id = '${inviteId}' and to_user_id = '${user.id}'`
     );
 
     return NextResponse.json({

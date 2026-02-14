@@ -1,12 +1,13 @@
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { UserGroupIcon, UserPlusIcon, UserIcon, InboxIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, UserGroupIcon, UserPlusIcon, UserIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useChat } from './chat/ChatContext';
 import AddFriendInline from './AddFriendInline';
 import FriendInvitesIcon from './FriendInvitesIcon';
 import FriendRequests from './FriendRequests';
 import { useFriendContext } from './FriendContext';
-import { useGroupContext, Group, GroupInvite, Member } from './GroupContext';
+import { useGroup } from '../hooks/useGroup';
+import type { GroupInvite } from '../types/group';
 import Modal from './Modal';
 import Button from './ui/button';
 import {
@@ -26,28 +27,16 @@ export default function RightSidebar() {
   const [openMenuFriendId, setOpenMenuFriendId] = useState<string | null>(null);
   const [openMenuGroupId, setOpenMenuGroupId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const groupMenuRef = useRef<HTMLDivElement | null>(null);
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [createGroupName, setCreateGroupName] = useState('');
   const [createGroupFriendIds, setCreateGroupFriendIds] = useState<string[]>([]);
   const [createGroupError, setCreateGroupError] = useState<string | null>(null);
   const [createGroupLoading, setCreateGroupLoading] = useState(false);
-  const [inviteGroup, setInviteGroup] = useState<Group | null>(null);
-  const [inviteGroupFriendIds, setInviteGroupFriendIds] = useState<string[]>([]);
-  const [inviteGroupError, setInviteGroupError] = useState<string | null>(null);
-  const [inviteGroupLoading, setInviteGroupLoading] = useState(false);
-  const [renameGroupTarget, setRenameGroupTarget] = useState<Group | null>(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renameError, setRenameError] = useState<string | null>(null);
-  const [renameLoading, setRenameLoading] = useState(false);
-  const [removeGroupTarget, setRemoveGroupTarget] = useState<Group | null>(null);
-  const [removeMembers, setRemoveMembers] = useState<Member[]>([]);
-  const [removeLoading, setRemoveLoading] = useState(false);
-  const [removeError, setRemoveError] = useState<string | null>(null);
-  const [removeFetching, setRemoveFetching] = useState(false);
-  const [leaveGroupTarget, setLeaveGroupTarget] = useState<Group | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [inviteFriendId, setInviteFriendId] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteLoadingGroupId, setInviteLoadingGroupId] = useState<string | null>(null);
   const [showEmptyButton, setShowEmptyButton] = useState(false);
   const [groupPanel, setGroupPanel] = useState<'none' | 'invites'>('none');
 
@@ -62,17 +51,6 @@ export default function RightSidebar() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [openMenuFriendId]);
-
-  useEffect(() => {
-    if (!openMenuGroupId) return;
-    function handleClick(e: MouseEvent) {
-      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target as Node)) {
-        setOpenMenuGroupId(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [openMenuGroupId]);
 
   // Type declarations
   type Friend = { id: string; name: string; publicId?: string | null; avatarUrl?: string | null; online?: boolean };
@@ -89,34 +67,26 @@ export default function RightSidebar() {
   const {
     currentUserId: currentGroupUserId,
     groups,
-    groupInvites,
-    groupsLoading,
-    invitesLoading,
-    groupsError,
-    invitesError,
-    unreadGroupInviteCount,
-    unreadMessageCounts,
-    isInviteUnread,
+    invites: groupInvites,
+    status,
+    errors,
+    unreadGroupIds,
+    unreadInviteIds,
+    markGroupsRead,
     markInvitesRead: markGroupInvitesRead,
-    markGroupInviteNotificationsRead,
-    markGroupMessagesRead,
     createGroup,
-    inviteToGroup,
+    inviteMembers,
     acceptInvite,
     rejectInvite,
-    removeMember,
-    leaveGroup,
-    renameGroup,
-    fetchMembers,
-  } = useGroupContext();
+  } = useGroup();
 
   // Reset tab notification when new invite arrives
   useEffect(() => {
     if (unreadInviteCount > 0) setInviteTabRead(false);
   }, [unreadInviteCount]);
   useEffect(() => {
-    if (unreadGroupInviteCount > 0) setGroupTabRead(false);
-  }, [unreadGroupInviteCount]);
+    if (unreadInviteIds.size > 0) setGroupTabRead(false);
+  }, [unreadInviteIds]);
 
   useEffect(() => {
     if (panel !== 'invites') return;
@@ -131,8 +101,8 @@ export default function RightSidebar() {
 
   useEffect(() => {
     if (groupPanel !== 'invites') return;
-    markGroupInviteNotificationsRead();
-  }, [groupPanel, markGroupInviteNotificationsRead]);
+    markGroupInvitesRead();
+  }, [groupPanel, groupInvites, markGroupInvitesRead]);
 
   const displayedFriends = panel === 'none' && query.trim().length > 0
     ? friends.filter((f: Friend) =>
@@ -141,10 +111,10 @@ export default function RightSidebar() {
       )
     : friends;
 
-  const groupUnreadTotal = unreadGroupInviteCount + Object.values(unreadMessageCounts).reduce((sum, v) => sum + v, 0);
+  const unreadGroupInviteCount = unreadInviteIds.size;
   const showFriendsSpinner = friendsLoading && friends.length === 0;
-  const showGroupsSpinner = groupsLoading && groups.length === 0;
-  const showGroupInvitesSpinner = invitesLoading && groupInvites.length === 0;
+  const showGroupsSpinner = status.groups === 'loading' && groups.length === 0;
+  const showGroupInvitesSpinner = status.invites === 'loading' && groupInvites.length === 0;
 
   function getChatId(kind: 'friend' | 'group', peerId: string) {
     return `${kind}:${peerId}`;
@@ -181,10 +151,9 @@ export default function RightSidebar() {
       window.dispatchEvent(new CustomEvent('openFloatingChat', { detail: { chatId } }));
     }
     resetUnread(chatId);
-    markGroupMessagesRead([id]);
-    markGroupInvitesRead([id]);
+    markGroupsRead([id]);
     setCurrentChatId(chatId);
-  }, [openGroupChat, resetUnread, markGroupMessagesRead, markGroupInvitesRead]);
+  }, [openGroupChat, resetUnread, markGroupsRead]);
 
   const handleOpenMenu = useCallback((id: string) => {
     setOpenMenuFriendId(id);
@@ -195,39 +164,33 @@ export default function RightSidebar() {
   }, []);
 
   const handleOpenGroupMenu = useCallback((id: string) => {
-    setOpenMenuGroupId(id);
+    setOpenMenuGroupId((prev) => (prev === id ? null : id));
   }, []);
 
   const handleCloseGroupMenu = useCallback(() => {
     setOpenMenuGroupId(null);
   }, []);
 
-  const handleGroupAction = useCallback((id: string, action: 'rename' | 'invite' | 'remove' | 'leave') => {
-    const target = groups.find((g) => g.id === id) || null;
-    if (!target) return;
-    if (action === 'rename') {
-      setRenameGroupTarget(target);
-      setRenameValue(target.name);
-      setRenameError(null);
+  const handleGroupAction = useCallback((id: string, action: 'rename' | 'invite' | 'remove' | 'leave' | 'manage') => {
+    if (action !== 'manage') return;
+    try {
+      window.dispatchEvent(new CustomEvent('openGroupManagement', { detail: { groupId: id } }));
+    } catch {
+      // ignore
     }
-    if (action === 'invite') {
-      setInviteGroup(target);
-      setInviteGroupFriendIds([]);
-      setInviteGroupError(null);
-    }
-    if (action === 'remove') {
-      setRemoveGroupTarget(target);
-      setRemoveMembers([]);
-      setRemoveError(null);
-    }
-    if (action === 'leave') {
-      setLeaveGroupTarget(target);
-    }
-  }, [groups]);
+  }, []);
 
   const handleConfirmRemove = useCallback((id: string) => {
     setConfirmRemoveId(id);
   }, []);
+
+  const handleInviteToGroup = useCallback((id: string) => {
+    setInviteError(null);
+    setInviteFriendId(id);
+  }, []);
+
+  const ownedGroups = groups.filter((g) => g.createdBy && g.createdBy === currentGroupUserId);
+  const friendToInvite = friends.find((fr) => fr.id === inviteFriendId) || null;
 
   // Modal state for friend removal confirmation
   const friendToRemove = friends.find(fr => fr.id === confirmRemoveId);
@@ -255,92 +218,84 @@ export default function RightSidebar() {
       </div>
     </div>
   ) : null;
+
+  const inviteModal = (
+    <Modal open={Boolean(inviteFriendId)} onClose={() => setInviteFriendId(null)} title={undefined} showCloseButton={true}>
+      <div className="p-6 max-w-3xl">
+        <div className="mb-4 pb-4 border-b border-white/10">
+          <div className="text-xl font-semibold text-white">Zaproś do grupy</div>
+          {friendToInvite && (
+            <div className="text-sm text-white/60 mt-1">{friendToInvite.name}</div>
+          )}
+        </div>
+        {ownedGroups.length === 0 ? (
+          <div className="text-sm text-white/60">Nie masz jeszcze własnej grupy.</div>
+        ) : (
+          <div className="space-y-2">
+            {ownedGroups.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                className="w-full text-left px-3 py-2 rounded-lg bg-white/6 hover:bg-white/10 text-white text-sm transition disabled:opacity-60"
+                disabled={inviteLoadingGroupId === g.id}
+                onClick={async () => {
+                  if (!inviteFriendId) return;
+                  setInviteError(null);
+                  setInviteLoadingGroupId(g.id);
+                  try {
+                    await inviteMembers(g.id, [inviteFriendId]);
+                    setInviteFriendId(null);
+                  } catch (err: any) {
+                    setInviteError(err?.message || 'Nie udało się wysłać zaproszenia');
+                  } finally {
+                    setInviteLoadingGroupId(null);
+                  }
+                }}
+              >
+                {g.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {inviteError && <div className="mt-3 text-xs text-red-400">{inviteError}</div>}
+      </div>
+    </Modal>
+  );
   // ...existing code...
 
   const createGroupModal = (
-    <Modal open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} title="Nowa grupa">
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setCreateGroupError(null);
-          setCreateGroupLoading(true);
-          try {
-            await createGroup(createGroupName, createGroupFriendIds);
-            setCreateGroupName('');
-            setCreateGroupFriendIds([]);
-            setCreateGroupOpen(false);
-          } catch (err: any) {
-            setCreateGroupError(err?.message || 'Nie udało się utworzyć grupy');
-          } finally {
-            setCreateGroupLoading(false);
-          }
-        }}
-        className="space-y-4"
-      >
-        <div>
-          <label className="block text-xs text-white/70 mb-1">Nazwa grupy</label>
-          <input
-            value={createGroupName}
-            onChange={(e) => setCreateGroupName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white text-sm"
-            placeholder="Np. Weekendowy wypad"
-          />
+    <Modal open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} title={undefined}>
+      <div className="p-6">
+        <div className="mb-4 pb-4 border-b border-white/10">
+          <div className="text-xl font-semibold text-white">Nowa grupa</div>
         </div>
-        <div>
-          <div className="text-xs text-white/70 mb-2">Wybierz znajomych do zaproszenia</div>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {friends.length === 0 ? (
-              <div className="text-xs text-white/60">Nie masz jeszcze znajomych.</div>
-            ) : (
-              friends.map((f) => (
-                <FriendSelectRow
-                  key={f.id}
-                  friend={{ id: f.id, name: f.name, publicId: f.publicId, avatarUrl: f.avatarUrl ?? null, online: f.online }}
-                  selected={createGroupFriendIds.includes(f.id)}
-                  onToggle={(id) => {
-                    setCreateGroupFriendIds((prev) =>
-                      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                    );
-                  }}
-                />
-              ))
-            )}
-          </div>
-        </div>
-        {createGroupError && <div className="text-xs text-red-400">{createGroupError}</div>}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={() => setCreateGroupOpen(false)} disabled={createGroupLoading}>Anuluj</Button>
-          <Button type="submit" disabled={createGroupLoading || !createGroupName.trim()}>
-            {createGroupLoading ? 'Tworzenie…' : 'Utwórz grupę'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-
-  const inviteGroupModal = (
-    <Modal open={Boolean(inviteGroup)} onClose={() => setInviteGroup(null)} title="Dodaj członków">
-      {inviteGroup && (
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            setInviteGroupError(null);
-            setInviteGroupLoading(true);
+            setCreateGroupError(null);
+            setCreateGroupLoading(true);
             try {
-              for (const friendId of inviteGroupFriendIds) {
-                await inviteToGroup(inviteGroup.id, friendId);
-              }
-              setInviteGroupFriendIds([]);
-              setInviteGroup(null);
+              await createGroup(createGroupName, createGroupFriendIds);
+              setCreateGroupName('');
+              setCreateGroupFriendIds([]);
+              setCreateGroupOpen(false);
             } catch (err: any) {
-              setInviteGroupError(err?.message || 'Nie udało się dodać członków');
+              setCreateGroupError(err?.message || 'Nie udało się utworzyć grupy');
             } finally {
-              setInviteGroupLoading(false);
+              setCreateGroupLoading(false);
             }
           }}
-          className="space-y-4"
+          className="space-y-6"
         >
-          <div className="text-xs text-white/70">Grupa: <span className="text-white">{inviteGroup.name}</span></div>
+          <div>
+            <label className="block text-xs text-white/70 mb-1">Nazwa grupy</label>
+            <input
+              value={createGroupName}
+              onChange={(e) => setCreateGroupName(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white text-sm"
+              placeholder="Np. Weekendowy wypad"
+            />
+          </div>
           <div>
             <div className="text-xs text-white/70 mb-2">Wybierz znajomych do zaproszenia</div>
             <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -351,9 +306,9 @@ export default function RightSidebar() {
                   <FriendSelectRow
                     key={f.id}
                     friend={{ id: f.id, name: f.name, publicId: f.publicId, avatarUrl: f.avatarUrl ?? null, online: f.online }}
-                    selected={inviteGroupFriendIds.includes(f.id)}
+                    selected={createGroupFriendIds.includes(f.id)}
                     onToggle={(id) => {
-                      setInviteGroupFriendIds((prev) =>
+                      setCreateGroupFriendIds((prev) =>
                         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
                       );
                     }}
@@ -362,127 +317,15 @@ export default function RightSidebar() {
               )}
             </div>
           </div>
-          {inviteGroupError && <div className="text-xs text-red-400">{inviteGroupError}</div>}
+          {createGroupError && <div className="text-xs text-red-400">{createGroupError}</div>}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setInviteGroup(null)} disabled={inviteGroupLoading}>Anuluj</Button>
-            <Button type="submit" disabled={inviteGroupLoading || inviteGroupFriendIds.length === 0}>
-              {inviteGroupLoading ? 'Dodawanie…' : 'Dodaj'}
+            <Button type="button" variant="ghost" onClick={() => setCreateGroupOpen(false)} disabled={createGroupLoading}>Anuluj</Button>
+            <Button type="submit" disabled={createGroupLoading || !createGroupName.trim()}>
+              {createGroupLoading ? 'Tworzenie…' : 'Utwórz grupę'}
             </Button>
           </div>
         </form>
-      )}
-    </Modal>
-  );
-
-  const renameGroupModal = (
-    <Modal open={Boolean(renameGroupTarget)} onClose={() => setRenameGroupTarget(null)} title="Zmień nazwę grupy">
-      {renameGroupTarget && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setRenameError(null);
-            setRenameLoading(true);
-            try {
-              await renameGroup(renameGroupTarget.id, renameValue);
-              setRenameGroupTarget(null);
-            } catch (err: any) {
-              setRenameError(err?.message || 'Nie udało się zmienić nazwy');
-            } finally {
-              setRenameLoading(false);
-            }
-          }}
-          className="space-y-4"
-        >
-          <input
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white text-sm"
-          />
-          {renameError && <div className="text-xs text-red-400">{renameError}</div>}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setRenameGroupTarget(null)} disabled={renameLoading}>Anuluj</Button>
-            <Button type="submit" disabled={renameLoading || !renameValue.trim()}>
-              {renameLoading ? 'Zapisywanie…' : 'Zapisz'}
-            </Button>
-          </div>
-        </form>
-      )}
-    </Modal>
-  );
-
-  const removeMemberModal = (
-    <Modal open={Boolean(removeGroupTarget)} onClose={() => setRemoveGroupTarget(null)} title="Usuń członka">
-      {removeGroupTarget && (
-        <div className="space-y-4">
-          <div className="text-xs text-white/70">Grupa: <span className="text-white">{removeGroupTarget.name}</span></div>
-          {removeFetching ? (
-            <div className="text-xs text-white/60">Ładowanie członków…</div>
-          ) : removeError ? (
-            <div className="text-xs text-red-400">{removeError}</div>
-          ) : removeMembers.length === 0 ? (
-            <div className="text-xs text-white/60">Brak członków do usunięcia.</div>
-          ) : (
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {removeMembers.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
-                  <div className="min-w-0">
-                    <div className="text-sm text-white truncate">{m.fullName ?? m.username ?? 'Użytkownik'}</div>
-                    <div className="text-xs text-white/50 truncate">ID: {m.publicId ?? '—'}</div>
-                  </div>
-                  <Button
-                    variant="danger"
-                    disabled={removeLoading || m.id === currentGroupUserId}
-                    onClick={async () => {
-                      if (!removeGroupTarget) return;
-                      setRemoveLoading(true);
-                      setRemoveError(null);
-                      try {
-                        await removeMember(removeGroupTarget.id, m.id);
-                        setRemoveMembers((prev) => prev.filter((x) => x.id !== m.id));
-                      } catch (err: any) {
-                        setRemoveError(err?.message || 'Nie udało się usunąć członka');
-                      } finally {
-                        setRemoveLoading(false);
-                      }
-                    }}
-                  >
-                    Usuń
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-end">
-            <Button type="button" variant="ghost" onClick={() => setRemoveGroupTarget(null)}>Zamknij</Button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-
-  const leaveGroupModal = (
-    <Modal open={Boolean(leaveGroupTarget)} onClose={() => setLeaveGroupTarget(null)} title="Opuścić grupę?">
-      {leaveGroupTarget && (
-        <div className="space-y-4">
-          <div className="text-sm text-white">Czy na pewno chcesz opuścić grupę <span className="font-semibold">{leaveGroupTarget.name}</span>?</div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setLeaveGroupTarget(null)}>Anuluj</Button>
-            <Button
-              variant="danger"
-              onClick={async () => {
-                try {
-                  await leaveGroup(leaveGroupTarget.id);
-                  setLeaveGroupTarget(null);
-                } catch (err: any) {
-                  setLeaveGroupTarget(null);
-                }
-              }}
-            >
-              Opuść
-            </Button>
-          </div>
-        </div>
-      )}
+      </div>
     </Modal>
   );
 
@@ -496,35 +339,11 @@ export default function RightSidebar() {
     }
   }, [friendsLoading, friendsError, friends]);
 
-  useEffect(() => {
-    if (!removeGroupTarget) return;
-    let active = true;
-    setRemoveFetching(true);
-    fetchMembers(removeGroupTarget.id)
-      .then((list) => {
-        if (!active) return;
-        setRemoveMembers(list);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setRemoveError(err instanceof Error ? err.message : 'Nie udało się pobrać członków');
-      })
-      .finally(() => {
-        if (active) setRemoveFetching(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [removeGroupTarget, fetchMembers]);
-
   return (
     <>
       {removeModal}
+      {inviteModal}
       {createGroupModal}
-      {inviteGroupModal}
-      {renameGroupModal}
-      {removeMemberModal}
-      {leaveGroupModal}
       <TooltipPortal tooltip={tooltip} />
       <nav className="flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl overflow-visible">
         
@@ -551,13 +370,7 @@ export default function RightSidebar() {
                   setActive('groups');
                   setGroupTabRead(true);
                 }}
-              >
-                {groupUnreadTotal > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-500 text-white min-w-[1.25rem]">
-                    {groupUnreadTotal}
-                  </span>
-                )}
-              </SectionTabButton>
+              />
             </div>
           </div>
           <div className="pt-3 border-b border-white/10" />
@@ -725,6 +538,7 @@ export default function RightSidebar() {
                                   onOpenChat={handleOpenChat}
                                   onOpenMenu={handleOpenMenu}
                                   onConfirmRemove={handleConfirmRemove}
+                                  onInviteToGroup={handleInviteToGroup}
                                   onCloseMenu={handleCloseMenu}
                                 />
                               );
@@ -761,15 +575,10 @@ export default function RightSidebar() {
                         onClick={() => {
                           const next = groupPanel === 'invites' ? 'none' : 'invites';
                           setGroupPanel(next);
-                          if (unreadGroupInviteCount > 0) markGroupInviteNotificationsRead();
+                          if (unreadGroupInviteCount > 0) markGroupInvitesRead();
                         }}
                       >
-                        <InboxIcon className="w-5 h-5" />
-                        {unreadGroupInviteCount > 0 && (
-                          <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-500 text-white min-w-[1.25rem]">
-                            {unreadGroupInviteCount}
-                          </span>
-                        )}
+                        <FriendInvitesIcon count={unreadGroupInviteCount} ariaLabel="Zaproszenia do grup" />
                       </ActionIconButton>
                       <ActionIconButton
                         ariaLabel="Utwórz nową grupę"
@@ -804,51 +613,91 @@ export default function RightSidebar() {
                         <div className="flex justify-center items-center h-40">
                           <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" />
                         </div>
-                      ) : invitesError ? (
-                        <div className="text-xs text-red-400">{invitesError}</div>
+                      ) : errors.invites ? (
+                        <div className="text-xs text-red-400">{errors.invites}</div>
                       ) : groupInvites.length === 0 ? (
                         <div className="text-xs text-white/60 px-2 py-3">Brak zaproszeń</div>
                       ) : (
-                        <div className="space-y-2 max-h-72 overflow-y-auto">
-                          {invitesLoading && groupInvites.length > 0 && (
+                        <div className="w-full max-w-md mx-auto rounded-lg py-1">
+                          {status.invites === 'loading' && groupInvites.length > 0 && (
                             <div className="flex justify-center items-center py-1">
                               <span className="inline-block animate-spin rounded-full border-2 border-emerald-300 border-t-transparent w-5 h-5" />
                             </div>
                           )}
-                          {groupInvites.map((inv: GroupInvite) => (
-                            <div key={inv.id} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
-                              <div className="min-w-0">
-                                <div className="text-sm text-white truncate">{inv.groupName}</div>
-                                <div className="text-xs text-white/50 truncate">Od: {inv.fromName ?? inv.fromPublicId ?? 'Użytkownik'}</div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="primary"
-                                  onClick={async () => {
-                                    try {
-                                      await acceptInvite(inv.id);
-                                    } catch (err) {
-                                      // ignore UI errors for now
-                                    }
-                                  }}
-                                >
-                                  Akceptuj
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  onClick={async () => {
-                                    try {
-                                      await rejectInvite(inv.id);
-                                    } catch (err) {
-                                      // ignore UI errors for now
-                                    }
-                                  }}
-                                >
-                                  Odrzuć
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                          <ul className="space-y-2">
+                            {groupInvites.map((inv: GroupInvite) => (
+                              <li key={inv.id} className="py-0.5 m-0 relative">
+                                <div className="w-full text-left rounded-lg transition group bg-transparent hover:bg-indigo-400/30 transition-transform duration-100 flex items-center gap-2 pr-[5px]">
+                                  <div className="w-10 h-10 rounded-full bg-white/8 flex items-center justify-center text-sm font-semibold text-white relative overflow-hidden">
+                                    {inv.groupAvatarUrl ? (
+                                      <img
+                                        src={inv.groupAvatarUrl}
+                                        alt={inv.groupName || 'Grupa'}
+                                        className="w-full h-full object-cover rounded-full"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <span>{(inv.groupName || '??').slice(0, 2).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm truncate transition-colors duration-200 text-white group-hover:text-indigo-100 group-focus:text-indigo-50">{inv.groupName}</div>
+                                    <div className="text-xs text-white/60 truncate">Od: {inv.fromName ?? inv.fromPublicId ?? 'Użytkownik'}</div>
+                                  </div>
+                                  <button
+                                    aria-label="Akceptuj zaproszenie do grupy"
+                                    className="w-6 h-6 flex items-center justify-center rounded-full border border-green-400 text-green-500 hover:bg-green-500 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-green-300 -ml-[2px]"
+                                    onClick={async (e) => {
+                                      setTooltip(null);
+                                      e.currentTarget.blur();
+                                      try {
+                                        await acceptInvite(inv.id);
+                                      } catch {
+                                        // ignore UI errors for now
+                                      }
+                                    }}
+                                    onMouseEnter={e => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setTooltip({ text: 'Akceptuj', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                                    }}
+                                    onMouseLeave={() => setTooltip(null)}
+                                    onFocus={e => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setTooltip({ text: 'Akceptuj', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                                    }}
+                                    onBlur={() => setTooltip(null)}
+                                  >
+                                    <CheckIcon className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    aria-label="Odrzuć zaproszenie do grupy"
+                                    className="w-6 h-6 flex items-center justify-center rounded-full border border-red-400 text-red-500 hover:bg-red-500 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-red-300 -ml-[2px]"
+                                    onClick={async (e) => {
+                                      setTooltip(null);
+                                      e.currentTarget.blur();
+                                      try {
+                                        await rejectInvite(inv.id);
+                                      } catch {
+                                        // ignore UI errors for now
+                                      }
+                                    }}
+                                    onMouseEnter={e => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setTooltip({ text: 'Odrzuć', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                                    }}
+                                    onMouseLeave={() => setTooltip(null)}
+                                    onFocus={e => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setTooltip({ text: 'Odrzuć', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                                    }}
+                                    onBlur={() => setTooltip(null)}
+                                  >
+                                    <XMarkIcon className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                     </div>
@@ -859,15 +708,15 @@ export default function RightSidebar() {
                         <div className="flex justify-center items-center h-40">
                           <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" />
                         </div>
-                      ) : groupsError ? (
-                        <div className="text-xs text-red-400 mt-2">{groupsError}</div>
+                      ) : errors.groups ? (
+                        <div className="text-xs text-red-400 mt-2">{errors.groups}</div>
                       ) : groups.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-40">
                           <NowaGrupaButton onClick={() => setCreateGroupOpen(true)} />
                         </div>
                       ) : (
                         <>
-                          {groupsLoading && groups.length > 0 && (
+                          {status.groups === 'loading' && groups.length > 0 && (
                             <div className="flex justify-center items-center py-2">
                               <span className="inline-block animate-spin rounded-full border-2 border-emerald-300 border-t-transparent w-5 h-5" />
                             </div>
@@ -881,19 +730,20 @@ export default function RightSidebar() {
                               )
                               .map((g) => {
                                 const chatId = getChatId('group', g.id);
-                                const unread = unreadMessageCounts[g.id] || 0;
+                                const unread = unreadCounts[getChatId('group', g.id)] || 0;
                                 return (
                                   <GroupRow
                                     key={g.id}
                                     group={g}
                                     unread={unread}
-                                    unreadInvite={isInviteUnread(g.id)}
+                                    unreadInvite={unreadGroupIds.has(g.id)}
                                     isMenuOpen={openMenuGroupId === g.id}
-                                    menuRef={groupMenuRef}
                                     onOpenChat={handleOpenGroupChat}
                                     onOpenMenu={handleOpenGroupMenu}
                                     onAction={handleGroupAction}
                                     onCloseMenu={handleCloseGroupMenu}
+                                    isCreator={g.createdBy === currentGroupUserId}
+                                    setTooltip={setTooltip}
                                   />
                                 );
                               })}

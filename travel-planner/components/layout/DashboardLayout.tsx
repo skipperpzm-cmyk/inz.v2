@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import Sidebar from '../Sidebar';
 import RightSidebar from '../RightSidebar';
+import { GroupManagementPanel } from '../groups';
 import { ChatProvider } from '../chat/ChatContext';
 import ChatView from '../ChatView';
 import DashboardHeader from './DashboardHeader';
@@ -32,6 +33,7 @@ export default function DashboardLayout({ children, user, title, readOnlySidebar
   const [backgrounds, setBackgrounds] = useState<string[]>([defaultBackgroundImage]);
 
   const [showAnimated, setShowAnimated] = useState<boolean>(true);
+  const [managedGroupId, setManagedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -87,6 +89,16 @@ export default function DashboardLayout({ children, user, title, readOnlySidebar
     // backgrounds and user are included in dependencies so recompute when they change
   }, [backgrounds, user]);
 
+  useEffect(() => {
+    function handleOpen(e: Event) {
+      const custom = e as CustomEvent<{ groupId?: string }>;
+      const nextId = custom.detail?.groupId ?? null;
+      setManagedGroupId(nextId);
+    }
+    window.addEventListener('openGroupManagement', handleOpen as EventListener);
+    return () => window.removeEventListener('openGroupManagement', handleOpen as EventListener);
+  }, []);
+
   return (
     <ChatProvider>
       <div className="min-h-screen relative flex flex-col">
@@ -132,6 +144,11 @@ export default function DashboardLayout({ children, user, title, readOnlySidebar
         </div>
       </motion.div>
       <ChatBubbles />
+      <GroupManagementPanel
+        open={Boolean(managedGroupId)}
+        groupId={managedGroupId}
+        onClose={() => setManagedGroupId(null)}
+      />
       </div>
     </ChatProvider>
   );

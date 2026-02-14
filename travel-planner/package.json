@@ -22,7 +22,7 @@
     "@supabase/supabase-js": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.2.3",
-    "drizzle-kit": "^0.18.1",
+    "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "framer-motion": "^11.0.0",
     "next": "^16.1.6",

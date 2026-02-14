@@ -59,10 +59,10 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json.error) throw new Error(json.error || 'Failed to remove member');
       setMembers((m) => m.filter((x) => x.id !== userId));
-      try { toast.push({ type: 'success', message: 'Member removed' }); } catch (er) { }
+      try { toast.push({ type: 'success', message: 'Członek został usunięty' }); } catch (er) { }
     } catch (err: any) {
       console.error(err);
-      const msg = err?.message || 'Failed to remove member';
+      const msg = err?.message || 'Nie udało się usunąć członka.';
       try { toast.push({ type: 'error', message: msg }); } catch (er) { }
     } finally {
       setLoadingId(null);
@@ -135,11 +135,11 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-white mb-3">Członkowie</h2>
+      <h2 className="text-lg font-semibold text-white mb-3">Członkowie grupy</h2>
       <div className="mb-4 flex items-center justify-end gap-3">
         {myRole === 'admin' ? (
           <div>
-            <Button onClick={() => setInviteModalOpen(true)} className="rounded-lg">Invite</Button>
+            <Button onClick={() => setInviteModalOpen(true)} className="rounded-lg">Zaproś</Button>
           </div>
         ) : null}
 
@@ -165,17 +165,17 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
             className="w-full px-3 py-2 rounded-lg bg-white/6 border border-white/10 text-white"
           />
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setInviteModalOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={inviteLoading}>{inviteLoading ? 'Sending…' : 'Send Invite'}</Button>
+            <Button type="button" variant="ghost" onClick={() => setInviteModalOpen(false)}>Anuluj</Button>
+            <Button type="submit" disabled={inviteLoading}>{inviteLoading ? 'Wysyłanie…' : 'Wyślij zaproszenie'}</Button>
           </div>
         </form>
       </Modal>
 
-        <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)} title="Login required">
-          <div className="text-slate-300">You need to be logged in to join this group.</div>
+        <Modal open={showLoginModal} onClose={() => setShowLoginModal(false)} title="Wymagane logowanie">
+          <div className="text-slate-300">Musisz być zalogowany, aby dołączyć do tej grupy.</div>
           <div className="mt-4 flex gap-3">
-            <Button onClick={onLoginNow}>Login</Button>
-            <Button variant="ghost" onClick={() => setShowLoginModal(false)}>Cancel</Button>
+            <Button onClick={onLoginNow}>Zaloguj się</Button>
+            <Button variant="ghost" onClick={() => setShowLoginModal(false)}>Anuluj</Button>
           </div>
         </Modal>
 
@@ -208,7 +208,7 @@ export default function GroupMembersList({ members: initialMembers, groupSlug, m
                 <div className="text-sm text-slate-300 mr-2">{m.role}</div>
                 {m.id === myUserId ? (
                   <Button variant="ghost" onClick={handleLeave} disabled={loadingId === 'me'}>{loadingId === 'me' ? '...' : 'Opuść'}</Button>
-                ) : (myRole === 'admin' ? (
+                ) : (myRole === 'admin' && m.role !== 'admin' ? (
                   <Button variant="danger" onClick={() => handleRemove(m.id)} disabled={loadingId === m.id}>{loadingId === m.id ? '...' : 'Usuń'}</Button>
                 ) : null)}
               </div>
