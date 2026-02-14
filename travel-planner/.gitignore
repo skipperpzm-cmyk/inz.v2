@@ -3,3 +3,9 @@
 /.next
 node_modules/
 dist/
+drizzle/
+supabase/migrations/
+migrations/
+logs/
+.cache/
+coverage/

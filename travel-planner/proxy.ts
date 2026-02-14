@@ -18,7 +18,7 @@ export function proxy(req: NextRequest) {
   // Basic Auth so ngrok-tunneled recipients can receive and accept
   // invites without entering the tunnel credentials. Keep this narrow
   // to only the endpoints used by the invite flow.
-  const allowedPrefixes = ['/api/friend-invites', '/api/u', '/api/profiles/search'];
+  const allowedPrefixes = ['/api/friend-invites', '/api/u', '/api/profiles/search', '/api/boards', '/api/user/heartbeat'];
   for (const p of allowedPrefixes) {
     if (pathname.startsWith(p)) return NextResponse.next();
   }
@@ -43,5 +43,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/user/heartbeat).*)'],
 };
