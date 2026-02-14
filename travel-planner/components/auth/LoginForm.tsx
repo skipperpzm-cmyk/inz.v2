@@ -36,6 +36,9 @@ export default function LoginForm() {
         if (!res.ok || data.success === false) {
           throw new Error(data.message ?? 'Nie mozna zweryfikowac linku.');
         }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:changed', { detail: { status: 'logged-in' } }));
+        }
         toast.push({ type: 'success', message: data.message ?? 'Zalogowano' });
         router.push('/dashboard');
         router.refresh();
@@ -103,6 +106,9 @@ export default function LoginForm() {
         throw new Error(data.message ?? 'Nie można się zalogować.');
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:changed', { detail: { status: 'logged-in' } }));
+      }
       toast.push({ type: 'success', message: data.message ?? 'Zalogowano' });
       router.push('/dashboard');
       router.refresh();

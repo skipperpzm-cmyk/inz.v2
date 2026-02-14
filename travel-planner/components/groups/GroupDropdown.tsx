@@ -10,12 +10,14 @@ type Props = {
   onClose: () => void;
   onManage: () => void;
   showManage: boolean;
+  onLeave: () => void;
+  showLeave: boolean;
 };
 
-export default function GroupDropdown({ group, isOpen, onToggle, onClose, onManage, showManage }: Props) {
+export default function GroupDropdown({ group, isOpen, onToggle, onClose, onManage, showManage, onLeave, showLeave }: Props) {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  if (!showManage) return null;
+  if (!showManage && !showLeave) return null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,6 +55,18 @@ export default function GroupDropdown({ group, isOpen, onToggle, onClose, onMana
             }}
           >
             Zarządzaj grupą
+          </button>
+        )}
+        {showLeave && (
+          <button
+            type="button"
+            className="w-full text-left px-3 py-1 rounded text-xs text-white/90 hover:bg-white/10 transition whitespace-nowrap flex items-center"
+            onClick={() => {
+              onLeave();
+              onClose();
+            }}
+          >
+            Opuść grupę
           </button>
         )}
       </div>

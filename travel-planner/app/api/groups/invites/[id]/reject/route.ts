@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { requireDb } from "@/src/db/db";
+import { sql } from "drizzle-orm";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -12,9 +13,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
   try {
     const db = requireDb();
-    const res = await (db as any).execute(
-      `delete from public.group_invites where id = $1 and to_user_id = $2`,
-      [inviteId, user.id]
+    await (db as any).execute(
+      sql`delete from public.group_invites where id = ${inviteId} and to_user_id = ${user.id}`
     );
     return NextResponse.json({ success: true });
   } catch (err) {

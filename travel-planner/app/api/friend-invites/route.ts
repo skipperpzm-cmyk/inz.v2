@@ -66,7 +66,19 @@ export async function POST(req: Request) {
     const created = await createInvite(user.id, String(toUserId));
     return NextResponse.json(created);
   } catch (err: any) {
+    const message = err?.message ?? 'Failed to create invite';
     console.error('API /api/friend-invites error:', err);
-    return NextResponse.json({ error: err?.message ?? 'Failed to create invite' }, { status: 500 });
+
+    if (message === 'Already friends') {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    if (message === 'Invite already pending') {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    if (message === 'Cannot invite yourself') {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

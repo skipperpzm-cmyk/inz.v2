@@ -203,6 +203,7 @@ type FriendRowProps = {
   onOpenMenu: (id: string) => void;
   onConfirmRemove: (id: string) => void;
   onInviteToGroup: (id: string) => void;
+  canInviteToGroup: boolean;
   onCloseMenu: () => void;
 };
 
@@ -220,6 +221,7 @@ export const FriendRow = React.memo(function FriendRow({
   onOpenMenu,
   onConfirmRemove,
   onInviteToGroup,
+  canInviteToGroup,
   onCloseMenu,
 }: FriendRowProps) {
   const chatId = `friend:${id}`;
@@ -267,6 +269,7 @@ export const FriendRow = React.memo(function FriendRow({
               onRemove={() => onConfirmRemove(id)}
               onInvite={() => onInviteToGroup(id)}
               canRemove={relationState === FriendRelationState.FRIENDS}
+              canInvite={canInviteToGroup}
             />
           </div>
         </div>
@@ -411,6 +414,8 @@ export const GroupRow = React.memo(function GroupRow({
               onClose={onCloseMenu}
               onManage={() => onAction(group.id, 'manage')}
               showManage={Boolean(isCreator)}
+              onLeave={() => onAction(group.id, 'leave')}
+              showLeave={!Boolean(isCreator)}
             />
           </div>
         </div>

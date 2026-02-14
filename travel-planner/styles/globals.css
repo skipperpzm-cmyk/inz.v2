@@ -317,8 +317,10 @@ textarea {
 
 /* Prevent layout shift when vertical scrollbar appears/disappears across pages.
    Always reserve scrollbar space and prefer a stable gutter to avoid horizontal shifts. */
-html {
-  /* No reserved scrollbar gutter; allow default browser behavior */
+/* Dashboard-scoped scroll fix: zapobiega layout shift tylko w dashboard-main */
+.dashboard-main {
+  scrollbar-gutter: stable both-edges;
+  overflow-x: hidden;
 }
 
 body {

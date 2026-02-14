@@ -4,7 +4,7 @@ import { requireDb } from "@/src/db/db";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json([], { status: 200 });
+  if (!user) return NextResponse.json([], { status: 200, headers: { 'Cache-Control': 'no-store' } });
 
   try {
     const db = requireDb();
@@ -40,9 +40,9 @@ export async function GET() {
       fromPublicId: r.public_id ?? null,
       createdAt: r.created_at ?? null,
     }));
-    return NextResponse.json(mapped);
+    return NextResponse.json(mapped, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error("group invites list error", err);
-    return NextResponse.json({ error: "Failed to fetch group invites" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch group invites" }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }

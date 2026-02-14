@@ -173,6 +173,9 @@ export function FriendProvider({ children }: { children: ReactNode }) {
   // Odświeżenie UI po logout (np. router push lub refreshFriends)
   const logoutAndRefresh = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('auth:changed', { detail: { status: 'logged-out' } }));
+    }
     await refreshFriends();
   };
   const [friendsLoading, setFriendsLoading] = useState(false);
@@ -508,25 +511,68 @@ export function FriendProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const res = await fetch('/api/user/me', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (typeof data?.id === 'string') {
-          setCurrentUserId(data.id);
-          // Wymuś odświeżenie zaproszeń po zalogowaniu
-          await refreshFriends();
-          await refreshInvites();
-        } else {
-          setCurrentUserId(null);
-        }
-      } catch (err) {
+  const loadCurrentUser = async () => {
+    try {
+      const res = await fetch("/api/user/me", { credentials: "include", cache: "no-store" });
+      if (!res.ok) {
         setCurrentUserId(null);
+        setFriends([]);
+        setPendingInvites([]);
+        setSentInvites([]);
+        return;
       }
+      const data = await res.json();
+      if (typeof data?.id === 'string') {
+        const userId = data.id;
+        setCurrentUserId(userId);
+        await refreshFriends();
+
+        const invitesRes = await fetch('/api/friend-invites', { credentials: 'include', cache: 'no-store' });
+        if (invitesRes.ok) {
+          const invitesData = await invitesRes.json().catch(() => ([]));
+          const invites = Array.isArray(invitesData) ? (invitesData as FriendInvite[]) : [];
+          const pending = invites.filter((invite) => invite.to_user_id === userId);
+          const sent = invites.filter((invite) => invite.from_user_id === userId);
+          setPendingInvites(pending);
+          setSentInvites(sent);
+          setReadInviteIds((prev) => {
+            const pendingIds = new Set(pending.map((invite) => invite.id));
+            const next = new Set<string>();
+            prev.forEach((id) => {
+              if (pendingIds.has(id)) next.add(id);
+            });
+            return next;
+          });
+        } else {
+          setPendingInvites([]);
+          setSentInvites([]);
+        }
+      } else {
+        setCurrentUserId(null);
+        setFriends([]);
+        setPendingInvites([]);
+        setSentInvites([]);
+      }
+    } catch {
+      setCurrentUserId(null);
+      setFriends([]);
+      setPendingInvites([]);
+      setSentInvites([]);
+    }
+  };
+
+  useEffect(() => {
+    void loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      void loadCurrentUser();
     };
-    loadCurrentUser();
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => {
+      window.removeEventListener('auth:changed', onAuthChanged);
+    };
   }, []);
 
   useEffect(() => {

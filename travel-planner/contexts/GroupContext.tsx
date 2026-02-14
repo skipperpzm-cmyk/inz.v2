@@ -43,6 +43,7 @@ type Action =
   | { type: "REMOVE_GROUP"; payload: string }
   | { type: "UPDATE_GROUP_NAME"; payload: { groupId: string; name: string } }
   | { type: "UPDATE_GROUP_AVATAR"; payload: { groupId: string; avatarUrl: string } }
+  | { type: "UPDATE_GROUP_MEMBER_COUNT"; payload: { groupId: string; count: number } }
   | { type: "REMOVE_MEMBER"; payload: { groupId: string; memberId: string } }
   | { type: "MARK_GROUPS_READ"; payload: string[] }
   | { type: "MARK_INVITES_READ"; payload: string[] };
@@ -186,10 +187,24 @@ function reducer(state: State, action: Action): State {
           g.id === action.payload.groupId ? { ...g, avatarUrl: action.payload.avatarUrl } : g
         ),
       };
+    case "UPDATE_GROUP_MEMBER_COUNT":
+      return {
+        ...state,
+        groups: state.groups.map((g) =>
+          g.id === action.payload.groupId
+            ? { ...g, memberCount: Math.max(0, Number(action.payload.count || 0)) }
+            : g
+        ),
+      };
     case "REMOVE_MEMBER": {
       const list = state.membersByGroupId[action.payload.groupId] || [];
       return {
         ...state,
+        groups: state.groups.map((g) =>
+          g.id === action.payload.groupId
+            ? { ...g, memberCount: Math.max(0, Number(g.memberCount || 0) - 1) }
+            : g
+        ),
         membersByGroupId: {
           ...state.membersByGroupId,
           [action.payload.groupId]: list.filter((m) => m.id !== action.payload.memberId),
@@ -229,6 +244,7 @@ export type GroupContextValue = {
   inviteMembers: (groupId: string, userIds: string[]) => Promise<void>;
   removeMember: (groupId: string, userId: string) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<void>;
   acceptInvite: (inviteId: string) => Promise<void>;
   rejectInvite: (inviteId: string) => Promise<void>;
   markGroupsRead: (groupIds?: string[]) => void;
@@ -241,11 +257,16 @@ const GroupContext = createContext<GroupContextValue | null>(null);
 export function GroupProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const membersRequestedRef = useRef<Set<string>>(new Set());
+  const membersByGroupIdRef = useRef<State["membersByGroupId"]>({});
+
+  useEffect(() => {
+    membersByGroupIdRef.current = state.membersByGroupId;
+  }, [state.membersByGroupId]);
 
   const refreshGroups = useCallback(async () => {
     dispatch({ type: "GROUPS_LOADING" });
     try {
-      const res = await fetch("/api/groups/list", { credentials: "include" });
+      const res = await fetch("/api/groups/list", { credentials: "include", cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load groups");
       const data = await res.json();
       const next = Array.isArray(data) ? (data as Group[]) : [];
@@ -261,7 +282,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   const refreshInvites = useCallback(async () => {
     dispatch({ type: "INVITES_LOADING" });
     try {
-      const res = await fetch("/api/groups/invites", { credentials: "include" });
+      const res = await fetch("/api/groups/invites", { credentials: "include", cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load invites");
       const data = await res.json();
       // GroupInvite now includes groupAvatarUrl for displaying group avatars in invites
@@ -285,6 +306,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       const members = Array.isArray(data) ? (data as GroupMember[]) : [];
       dispatch({ type: "MEMBERS_SUCCESS", payload: { groupId, members } });
+      dispatch({ type: "UPDATE_GROUP_MEMBER_COUNT", payload: { groupId, count: members.length } });
       return members;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load members";
@@ -385,6 +407,14 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "MARK_GROUPS_READ", payload: [groupId] });
   }, []);
 
+  const deleteGroup = useCallback(async (groupId: string) => {
+    const res = await fetch(`/api/groups/${encodeURIComponent(groupId)}/delete`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) throw new Error(json.error || "Failed to delete group");
+    dispatch({ type: "REMOVE_GROUP", payload: groupId });
+    dispatch({ type: "MARK_GROUPS_READ", payload: [groupId] });
+  }, []);
+
   const acceptInvite = useCallback(async (inviteId: string) => {
     const res = await fetch(`/api/groups/invites/${encodeURIComponent(inviteId)}/accept`, {
       method: "POST",
@@ -425,29 +455,48 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     [state.currentUserId]
   );
 
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const res = await fetch("/api/user/me", { credentials: "include" });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (mounted && typeof data?.id === "string") {
-          dispatch({ type: "SET_USER", payload: data.id });
-          await refreshGroups();
-          await refreshInvites();
-        }
-      } catch {
-        // ignore
+  const loadUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/me", { credentials: "include", cache: "no-store" });
+      if (!res.ok) {
+        dispatch({ type: "SET_USER", payload: null });
+        dispatch({ type: "GROUPS_SUCCESS", payload: [] });
+        dispatch({ type: "INVITES_SUCCESS", payload: [] });
+        return;
       }
-    };
-    void loadUser();
-    return () => {
-      mounted = false;
-    };
+      const data = await res.json();
+      if (typeof data?.id === "string") {
+        dispatch({ type: "SET_USER", payload: data.id });
+        await refreshGroups();
+        await refreshInvites();
+      } else {
+        dispatch({ type: "SET_USER", payload: null });
+        dispatch({ type: "GROUPS_SUCCESS", payload: [] });
+        dispatch({ type: "INVITES_SUCCESS", payload: [] });
+      }
+    } catch {
+      dispatch({ type: "SET_USER", payload: null });
+      dispatch({ type: "GROUPS_SUCCESS", payload: [] });
+      dispatch({ type: "INVITES_SUCCESS", payload: [] });
+    }
   }, [refreshGroups, refreshInvites]);
 
   useEffect(() => {
+    void loadUser();
+  }, [loadUser]);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      void loadUser();
+    };
+    window.addEventListener("auth:changed", onAuthChanged);
+    return () => {
+      window.removeEventListener("auth:changed", onAuthChanged);
+    };
+  }, [loadUser]);
+
+  useEffect(() => {
+    if (!state.currentUserId) return;
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
@@ -462,7 +511,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       }
       if (payload.table === "group_members") {
         void refreshGroups();
-        const groupIds = Object.keys(state.membersByGroupId);
+        const groupIds = Object.keys(membersByGroupIdRef.current);
         groupIds.forEach((groupId) => {
           if (membersRequestedRef.current.has(groupId)) return;
           membersRequestedRef.current.add(groupId);
@@ -473,29 +522,86 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const channel = supabase
-      .channel("groups-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "groups" },
-        (payload) => onChange(payload)
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_invites" },
-        (payload) => onChange(payload)
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_members" },
-        (payload) => onChange(payload)
-      )
-      .subscribe();
+    let cancelled = false;
+    let groupsChannel: ReturnType<typeof supabase.channel> | null = null;
+    let invitesChannel: ReturnType<typeof supabase.channel> | null = null;
+    let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+    const refreshRealtimeToken = async () => {
+      try {
+        const tokenRes = await fetch("/api/supabase/realtime-token", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!tokenRes.ok) return false;
+        const tokenJson = await tokenRes.json().catch(() => ({}));
+        if (cancelled) return false;
+        if (typeof tokenJson?.token === "string") {
+          supabase.realtime.setAuth(tokenJson.token);
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    (async () => {
+      const authed = await refreshRealtimeToken();
+      if (!authed || cancelled) return;
+
+      invitesChannel = supabase
+        .channel(`group-invites:${state.currentUserId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "group_invites",
+            filter: `to_user_id=eq.${state.currentUserId}`,
+          },
+          () => {
+            void refreshInvites();
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            void refreshInvites();
+          }
+        });
+
+      groupsChannel = supabase
+        .channel(`groups-realtime:${state.currentUserId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "groups" },
+          (payload) => onChange(payload)
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "group_members" },
+          (payload) => onChange(payload)
+        )
+        .subscribe();
+
+      refreshTimer = setInterval(() => {
+        void refreshRealtimeToken();
+      }, 45 * 60 * 1000);
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+      }
+      if (invitesChannel) {
+        supabase.removeChannel(invitesChannel);
+      }
+      if (groupsChannel) {
+        supabase.removeChannel(groupsChannel);
+      }
     };
-  }, [fetchMembers, refreshGroups, refreshInvites, state.membersByGroupId]);
+  }, [fetchMembers, refreshGroups, refreshInvites, state.currentUserId]);
 
   const value = useMemo<GroupContextValue>(
     () => ({
@@ -516,6 +622,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       inviteMembers,
       removeMember,
       leaveGroup,
+      deleteGroup,
       acceptInvite,
       rejectInvite,
       markGroupsRead: markGroupsRead,
@@ -540,7 +647,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       inviteMembers,
       removeMember,
       leaveGroup,
-      leaveGroup,
+      deleteGroup,
       acceptInvite,
       rejectInvite,
       markGroupsRead,

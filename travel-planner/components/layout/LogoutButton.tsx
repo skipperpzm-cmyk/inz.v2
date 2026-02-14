@@ -12,6 +12,9 @@ export default function LogoutButton() {
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
       if (!res.ok) throw new Error('Wylogowanie nie powiodło się');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:changed', { detail: { status: 'logged-out' } }));
+      }
       toast.push({ type: 'success', message: 'Wylogowano' });
       router.push('/');
     } catch (err) {

@@ -17,10 +17,11 @@ type Props = {
 };
 
 export default function GroupManagementPanel({ groupId, open, onClose }: Props) {
-  const { groups, invites, canManage, markGroupsRead, markInvitesRead } = useGroup();
+  const { groups, invites, canManage, markGroupsRead, markInvitesRead, deleteGroup } = useGroup();
   const [displayGroup, setDisplayGroup] = useState<Group | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const group = useMemo(() => groups.find((g) => g.id === groupId) || null, [groups, groupId]);
   const invitesForGroup = useMemo(
@@ -42,16 +43,26 @@ export default function GroupManagementPanel({ groupId, open, onClose }: Props) 
     }
   }, [open, group]);
 
+  useEffect(() => {
+    if (open && groupId && !group) {
+      onClose();
+    }
+  }, [open, groupId, group, onClose]);
+
   if (!displayGroup) return null;
   const isOwner = canManage(displayGroup);
   const handleDeleteGroup = async () => {
     setDeleteLoading(true);
-    // await api.deleteGroup(displayGroup.id);
-    setTimeout(() => {
+    setDeleteError(null);
+    try {
+      await deleteGroup(displayGroup.id);
       setDeleteLoading(false);
       setDeleteConfirm(false);
       onClose();
-    }, 1200);
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Nie udało się usunąć grupy');
+      setDeleteLoading(false);
+    }
   };
 
   return (
@@ -128,6 +139,7 @@ export default function GroupManagementPanel({ groupId, open, onClose }: Props) 
                   <div className="bg-white rounded-xl p-6 shadow-xl text-gray-900 w-full max-w-sm">
                     <div className="text-lg font-semibold mb-2">Czy na pewno chcesz usunąć grupę?</div>
                     <div className="text-sm mb-4">Tej operacji nie można cofnąć.</div>
+                    {deleteError && <div className="text-xs text-red-600 mb-3">{deleteError}</div>}
                     <div className="flex gap-3 justify-end">
                       <button
                         type="button"

@@ -37,6 +37,9 @@ export default function RightSidebar() {
   const [inviteFriendId, setInviteFriendId] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteLoadingGroupId, setInviteLoadingGroupId] = useState<string | null>(null);
+  const [confirmLeaveGroupId, setConfirmLeaveGroupId] = useState<string | null>(null);
+  const [leaveGroupLoading, setLeaveGroupLoading] = useState(false);
+  const [leaveGroupError, setLeaveGroupError] = useState<string | null>(null);
   const [showEmptyButton, setShowEmptyButton] = useState(false);
   const [groupPanel, setGroupPanel] = useState<'none' | 'invites'>('none');
 
@@ -76,6 +79,7 @@ export default function RightSidebar() {
     markInvitesRead: markGroupInvitesRead,
     createGroup,
     inviteMembers,
+    leaveGroup,
     acceptInvite,
     rejectInvite,
   } = useGroup();
@@ -171,14 +175,22 @@ export default function RightSidebar() {
     setOpenMenuGroupId(null);
   }, []);
 
-  const handleGroupAction = useCallback((id: string, action: 'rename' | 'invite' | 'remove' | 'leave' | 'manage') => {
-    if (action !== 'manage') return;
-    try {
-      window.dispatchEvent(new CustomEvent('openGroupManagement', { detail: { groupId: id } }));
-    } catch {
-      // ignore
+  const handleGroupAction = useCallback(async (id: string, action: 'rename' | 'invite' | 'remove' | 'leave' | 'manage') => {
+    if (action === 'manage') {
+      try {
+        window.dispatchEvent(new CustomEvent('openGroupManagement', { detail: { groupId: id } }));
+      } catch {
+        // ignore
+      }
+      return;
     }
-  }, []);
+
+    if (action === 'leave') {
+      setLeaveGroupError(null);
+      setConfirmLeaveGroupId(id);
+      return;
+    }
+  }, [leaveGroup]);
 
   const handleConfirmRemove = useCallback((id: string) => {
     setConfirmRemoveId(id);
@@ -190,34 +202,53 @@ export default function RightSidebar() {
   }, []);
 
   const ownedGroups = groups.filter((g) => g.createdBy && g.createdBy === currentGroupUserId);
+  const canInviteToAnyOwnedGroup = ownedGroups.length > 0;
   const friendToInvite = friends.find((fr) => fr.id === inviteFriendId) || null;
+  const groupToLeave = groups.find((g) => g.id === confirmLeaveGroupId) || null;
 
   // Modal state for friend removal confirmation
   const friendToRemove = friends.find(fr => fr.id === confirmRemoveId);
-  const removeModal = confirmRemoveId ? (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative z-[10001] bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 w-full max-w-xs sm:max-w-sm flex flex-col items-center animate-fadein">
-        <div className="text-lg font-semibold text-gray-900 dark:text-white mb-2 text-center">Czy na pewno chcesz usunąć znajomego?</div>
-        {friendToRemove && (
-          <div className="mb-4 text-sm text-gray-700 dark:text-gray-300 text-center">{friendToRemove.name} ({friendToRemove.publicId ?? '—'})</div>
-        )}
-        <div className="flex gap-3 mt-2">
-          <button
-            className="px-4 py-2 rounded-lg bg-indigo-500 text-white font-semibold shadow hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 transition"
+  const removeModal = (
+    <Modal
+      open={Boolean(confirmRemoveId)}
+      onClose={() => setConfirmRemoveId(null)}
+      title={undefined}
+      showCloseButton={true}
+    >
+      <div className="p-6 max-w-md mx-auto overflow-hidden" style={{overflow:'hidden', maxWidth:'400px', maxHeight:'90vh'}}>
+        <div className="mb-4 pb-4 border-b border-white/10">
+          <div className="text-xl font-semibold text-white text-center">Czy na pewno chcesz usunąć znajomego?</div>
+          {friendToRemove && (
+            <div className="flex flex-col items-center mt-4">
+              {friendToRemove.avatarUrl ? (
+                <img src={friendToRemove.avatarUrl} alt="Avatar" className="w-16 h-16 rounded-full object-cover mb-2 border border-white/20" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-lg text-white mb-2 border border-white/20">
+                  <UserIcon className="w-8 h-8 text-white/60" />
+                </div>
+              )}
+              <div className="text-base font-medium text-white mt-1">{friendToRemove.name}</div>
+              <div className="text-xs text-white/50">{friendToRemove.publicId ?? '—'}</div>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-center gap-2 mt-6">
+          <Button type="button" variant="ghost" onClick={() => setConfirmRemoveId(null)}>
+            Anuluj
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
             onClick={async () => {
               if (!confirmRemoveId) return;
               await unfriend(confirmRemoveId);
+              setConfirmRemoveId(null);
             }}
-          >Usuń</button>
-          <button
-            className="px-4 py-2 rounded-lg bg-gray-300 text-gray-900 font-semibold shadow hover:bg-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/60 transition"
-            onClick={() => setConfirmRemoveId(null)}
-          >Anuluj</button>
+          >Usuń</Button>
         </div>
       </div>
-    </div>
-  ) : null;
+    </Modal>
+  );
 
   const inviteModal = (
     <Modal open={Boolean(inviteFriendId)} onClose={() => setInviteFriendId(null)} title={undefined} showCloseButton={true}>
@@ -329,6 +360,59 @@ export default function RightSidebar() {
     </Modal>
   );
 
+  const leaveGroupModal = (
+    <Modal
+      open={Boolean(confirmLeaveGroupId)}
+      onClose={() => {
+        if (leaveGroupLoading) return;
+        setConfirmLeaveGroupId(null);
+        setLeaveGroupError(null);
+      }}
+      title={undefined}
+      showCloseButton={true}
+    >
+      <div className="p-6">
+        <div className="mb-4 pb-4 border-b border-white/10">
+          <div className="text-xl font-semibold text-white">Czy na pewno chcesz opuścić grupę?</div>
+          {groupToLeave && <div className="text-sm text-white/60 mt-1">{groupToLeave.name}</div>}
+        </div>
+        {leaveGroupError && <div className="text-xs text-red-400 mb-3">{leaveGroupError}</div>}
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={leaveGroupLoading}
+            onClick={() => {
+              setConfirmLeaveGroupId(null);
+              setLeaveGroupError(null);
+            }}
+          >
+            nie
+          </Button>
+          <Button
+            type="button"
+            disabled={leaveGroupLoading || !confirmLeaveGroupId}
+            onClick={async () => {
+              if (!confirmLeaveGroupId) return;
+              setLeaveGroupError(null);
+              setLeaveGroupLoading(true);
+              try {
+                await leaveGroup(confirmLeaveGroupId);
+                setConfirmLeaveGroupId(null);
+              } catch (err: any) {
+                setLeaveGroupError(err?.message || 'Nie udało się opuścić grupy');
+              } finally {
+                setLeaveGroupLoading(false);
+              }
+            }}
+          >
+            {leaveGroupLoading ? 'Trwa…' : 'tak'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+
   // Much larger delay for empty friends list, and smooth slide-in
   useEffect(() => {
     if (!friendsLoading && !friendsError && Array.isArray(friends) && friends.length === 0) {
@@ -344,6 +428,7 @@ export default function RightSidebar() {
       {removeModal}
       {inviteModal}
       {createGroupModal}
+      {leaveGroupModal}
       <TooltipPortal tooltip={tooltip} />
       <nav className="flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl overflow-visible">
         
@@ -539,6 +624,7 @@ export default function RightSidebar() {
                                   onOpenMenu={handleOpenMenu}
                                   onConfirmRemove={handleConfirmRemove}
                                   onInviteToGroup={handleInviteToGroup}
+                                  canInviteToGroup={canInviteToAnyOwnedGroup}
                                   onCloseMenu={handleCloseMenu}
                                 />
                               );
