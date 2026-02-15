@@ -1,7 +1,7 @@
 import StatWidget from '../../components/StatWidget';
 import Card from '../../components/Card';
 import Button from '../../components/ui/button';
-import { getCurrentUser } from '../../lib/auth';
+import { getCurrentUser, getCurrentUserId } from '../../lib/auth';
 import { getTripsByUser } from '../../src/db/repositories/trip.repository';
 import { getBoardsByTripId } from '../../src/db/repositories/board.repository';
 import { getItemsByBoardId } from '../../src/db/repositories/boardItem.repository';
@@ -24,12 +24,14 @@ function formatStatusLabel(status?: string | null) {
 const formatDateLabel = (value?: string | null) => value ?? 'Do ustalenia';
 
 export default async function DashboardPage() {
-    const user = await getCurrentUser();
-    if (!user) {
+    const userId = await getCurrentUserId();
+    if (!userId) {
         redirect('/login');
     }
 
-    const trips = await getTripsByUser(user.id);
+    const user = await getCurrentUser();
+
+    const trips = await getTripsByUser(userId);
     const boardGroups = await Promise.all(trips.map((trip) => getBoardsByTripId(trip.id)));
     const boards = boardGroups.flat();
     const boardItemsGroups = await Promise.all(boards.map((board) => getItemsByBoardId(board.id)));
@@ -38,7 +40,7 @@ export default async function DashboardPage() {
     return (
         <div className="space-y-4 lg:pl-6">
             <div className="flex flex-col gap-2">
-                <p className="text-sm text-slate-300">Witaj ponownie, {user.username ?? user.email}</p>
+                <p className="text-sm text-slate-300">Witaj ponownie, {user?.username ?? user?.email ?? 'Podróżniku'}</p>
                 <h1 className="text-3xl font-semibold text-white">Twój panel</h1>
             </div>
 

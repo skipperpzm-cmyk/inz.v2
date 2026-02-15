@@ -6,6 +6,28 @@ import { sqlClient } from '@/src/db/db';
 type Params = { params: Promise<{ groupId: string }> };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function parseChecklistAndDetails(rawChecklist: unknown): { checklist: string[]; details: Record<string, unknown> | undefined } {
+  if (Array.isArray(rawChecklist)) {
+    return {
+      checklist: rawChecklist.map((item) => String(item)).filter(Boolean),
+      details: undefined,
+    };
+  }
+
+  if (rawChecklist && typeof rawChecklist === 'object') {
+    const payload = rawChecklist as { items?: unknown; details?: unknown };
+    const checklist = Array.isArray(payload.items)
+      ? payload.items.map((item) => String(item)).filter(Boolean)
+      : [];
+    const details = payload.details && typeof payload.details === 'object'
+      ? (payload.details as Record<string, unknown>)
+      : undefined;
+    return { checklist, details };
+  }
+
+  return { checklist: [], details: undefined };
+}
+
 export async function GET(_request: Request, context: Params) {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(getSessionCookieName())?.value;
@@ -21,6 +43,7 @@ export async function GET(_request: Request, context: Params) {
           select
             g.id as group_id,
             g.name as group_name,
+            coalesce(nullif(gb.board_name, ''), g.name) as board_name,
             g.avatar_url as group_avatar_url,
             g.created_by as owner_id,
             gm.role,
@@ -44,6 +67,7 @@ export async function GET(_request: Request, context: Params) {
           select
             g.id as group_id,
             g.name as group_name,
+            coalesce(nullif(gb.board_name, ''), g.name) as board_name,
             g.avatar_url as group_avatar_url,
             g.created_by as owner_id,
             gm.role,
@@ -67,10 +91,13 @@ export async function GET(_request: Request, context: Params) {
     const row = Array.isArray(rows) && rows.length ? rows[0] : null;
     if (!row) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
 
+    const { checklist, details } = parseChecklistAndDetails(row.checklist);
+
     return NextResponse.json(
       {
         groupId: String(row.group_id),
         groupName: String(row.group_name ?? ''),
+        boardName: String(row.board_name ?? row.group_name ?? ''),
         groupAvatarUrl: row.group_avatar_url ?? null,
         ownerId: String(row.owner_id ?? ''),
         role: row.role === 'admin' ? 'admin' : 'member',
@@ -80,7 +107,8 @@ export async function GET(_request: Request, context: Params) {
           endDate: row.end_date ?? null,
           description: row.description ?? null,
           budget: row.budget != null ? Number(row.budget) : null,
-          checklist: Array.isArray(row.checklist) ? row.checklist : [],
+          checklist,
+          details,
           updatedAt: row.updated_at ?? null,
         },
       },

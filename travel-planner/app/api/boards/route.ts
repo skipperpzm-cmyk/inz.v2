@@ -12,6 +12,7 @@ export async function GET() {
       select
         g.id as group_id,
         g.name as group_name,
+        coalesce(nullif(gb.board_name, ''), g.name) as board_name,
         g.avatar_url as group_avatar_url,
         (select count(*) from public.group_members gm2 where gm2.group_id = g.id)::int as member_count,
         gb.updated_at as board_updated_at,
@@ -27,6 +28,7 @@ export async function GET() {
     const mapped = data.map((r: any) => ({
       groupId: String(r.group_id),
       groupName: String(r.group_name ?? ''),
+      boardName: String(r.board_name ?? r.group_name ?? ''),
       groupAvatarUrl: r.group_avatar_url ?? null,
       memberCount: Number(r.member_count ?? 0),
       lastActivity: r.last_post_at ?? r.board_updated_at ?? null,

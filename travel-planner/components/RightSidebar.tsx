@@ -430,7 +430,7 @@ export default function RightSidebar() {
       {createGroupModal}
       {leaveGroupModal}
       <TooltipPortal tooltip={tooltip} />
-      <nav className="flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl overflow-visible">
+      <nav className="right-sidebar-panel flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl overflow-visible">
         
         <div className="sticky top-0 z-20 -mx-4 px-4 pb-2 bg-transparent">
           <div className="flex w-full justify-center">

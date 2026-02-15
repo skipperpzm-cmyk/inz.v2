@@ -27,11 +27,19 @@ type BoardContextValue = {
   createComment: (postId: string, content: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   deleteComment: (commentId: string) => Promise<void>;
   loadMoreComments: (postId: string) => Promise<void>;
+  updateBoardName: (groupId: string, boardName: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   updateTravelInfo: (groupId: string, payload: BoardTravelInfo, opts?: { signal?: AbortSignal }) => Promise<void>;
   clearBoardState: () => void;
 };
 
 const BoardContext = createContext<BoardContextValue | null>(null);
+
+const isPublicRoute = (pathname: string) => {
+  if (pathname === '/' || pathname === '/login' || pathname === '/register' || pathname === '/signin') {
+    return true;
+  }
+  return pathname.startsWith('/demo') || pathname.startsWith('/u/');
+};
 
 export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -442,6 +450,34 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateBoardName = useCallback(async (groupId: string, boardName: string, opts?: { signal?: AbortSignal }) => {
+    const trimmed = boardName.trim();
+    if (!trimmed) throw new Error('Nazwa tablicy jest wymagana');
+    setError(null);
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/info`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify({ boardName: trimmed }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) {
+        throw new Error(json?.error || 'Nie udało się zapisać nazwy tablicy');
+      }
+
+      const nextBoardName = typeof json?.boardName === 'string' && json.boardName.trim() ? json.boardName : trimmed;
+      setActiveBoard((prev) => (prev && prev.groupId === groupId ? { ...prev, boardName: nextBoardName } : prev));
+      setBoards((prev) => prev.map((entry) => (entry.groupId === groupId ? { ...entry, boardName: nextBoardName } : entry)));
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      const message = err instanceof Error ? err.message : 'Nie udało się zapisać nazwy tablicy';
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
+    }
+  }, []);
+
   const loadMoreComments = useCallback(async (postId: string) => {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
@@ -477,31 +513,55 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [mergeComments, posts]);
 
+  // Ładuj usera i reaguj na logout/login (auth:changed)
   useEffect(() => {
+    let mounted = true;
     const loadCurrentUser = async () => {
+      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+        if (mounted) {
+          setCurrentUserId(null);
+          setCurrentUserName('Ty');
+          setCurrentUserAvatar(null);
+        }
+        return;
+      }
       try {
         const res = await fetch('/api/user/me', { credentials: 'include', cache: 'no-store' });
         if (!res.ok) {
-          setCurrentUserId(null);
+          if (mounted) {
+            setCurrentUserId(null);
+            setCurrentUserName('Ty');
+            setCurrentUserAvatar(null);
+          }
           return;
         }
         const data = await res.json();
-        setCurrentUserId(typeof data?.id === 'string' ? data.id : null);
-        setCurrentUserName((data?.usernameDisplay || data?.username || data?.email || 'Ty') as string);
-        setCurrentUserAvatar((data?.avatarUrl ?? null) as string | null);
+        if (mounted) {
+          setCurrentUserId(typeof data?.id === 'string' ? data.id : null);
+          setCurrentUserName((data?.usernameDisplay || data?.username || data?.email || 'Ty') as string);
+          setCurrentUserAvatar((data?.avatarUrl ?? null) as string | null);
+        }
       } catch {
-        setCurrentUserId(null);
+        if (mounted) {
+          setCurrentUserId(null);
+          setCurrentUserName('Ty');
+          setCurrentUserAvatar(null);
+        }
       }
     };
-
-    void loadCurrentUser();
-
-    const onAuthChanged = () => {
-      void loadCurrentUser();
+    loadCurrentUser();
+    const onAuthChanged = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.status === 'logged-out') {
+        setCurrentUserId(null);
+        setCurrentUserName('Ty');
+        setCurrentUserAvatar(null);
+      } else {
+        loadCurrentUser();
+      }
     };
-
     window.addEventListener('auth:changed', onAuthChanged);
-    return () => window.removeEventListener('auth:changed', onAuthChanged);
+    return () => { mounted = false; window.removeEventListener('auth:changed', onAuthChanged); };
   }, []);
 
   useEffect(() => {
@@ -658,6 +718,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       createComment,
       deleteComment,
       loadMoreComments,
+      updateBoardName,
       updateTravelInfo,
       clearBoardState,
     }),
@@ -682,6 +743,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       createComment,
       deleteComment,
       loadMoreComments,
+      updateBoardName,
       updateTravelInfo,
       clearBoardState,
     ]

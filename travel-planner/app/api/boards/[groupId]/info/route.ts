@@ -6,6 +6,28 @@ type Params = { params: Promise<{ groupId: string }> };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function parseChecklistAndDetails(rawChecklist: unknown): { checklist: string[]; details: Record<string, unknown> | undefined } {
+  if (Array.isArray(rawChecklist)) {
+    return {
+      checklist: rawChecklist.map((item) => String(item)).filter(Boolean),
+      details: undefined,
+    };
+  }
+
+  if (rawChecklist && typeof rawChecklist === 'object') {
+    const payload = rawChecklist as { items?: unknown; details?: unknown };
+    const checklist = Array.isArray(payload.items)
+      ? payload.items.map((item) => String(item)).filter(Boolean)
+      : [];
+    const details = payload.details && typeof payload.details === 'object'
+      ? (payload.details as Record<string, unknown>)
+      : undefined;
+    return { checklist, details };
+  }
+
+  return { checklist: [], details: undefined };
+}
+
 export async function PUT(request: Request, context: Params) {
   const userId = await getCurrentUserId();
   if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -52,16 +74,22 @@ export async function PUT(request: Request, context: Params) {
       endDate?: unknown;
       description?: unknown;
       budget?: unknown;
+      details?: unknown;
+      boardName?: unknown;
     };
 
     const checklist = Array.isArray(payload.checklist)
       ? payload.checklist.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 200)
       : [];
+    const details = payload.details && typeof payload.details === 'object'
+      ? (payload.details as Record<string, unknown>)
+      : undefined;
 
     const location = typeof payload.location === 'string' ? payload.location.trim().slice(0, 200) : null;
     const startDate = typeof payload.startDate === 'string' && DATE_RE.test(payload.startDate) ? payload.startDate : null;
     const endDate = typeof payload.endDate === 'string' && DATE_RE.test(payload.endDate) ? payload.endDate : null;
     const description = typeof payload.description === 'string' ? payload.description.trim().slice(0, 5000) : null;
+    const boardName = typeof payload.boardName === 'string' ? payload.boardName.trim().slice(0, 120) : null;
     const parsedBudget = payload.budget == null || payload.budget === '' ? null : Number(payload.budget);
     const budget = parsedBudget == null ? null : Number.isFinite(parsedBudget) ? parsedBudget : null;
 
@@ -69,11 +97,18 @@ export async function PUT(request: Request, context: Params) {
       return NextResponse.json({ error: 'Data końca nie może być wcześniejsza niż data startu' }, { status: 422 });
     }
 
+    const checklistPayload = JSON.stringify(
+      details
+        ? { items: checklist, details }
+        : checklist
+    );
+
     await sqlClient`
-      insert into public.group_boards (group_id, location, start_date, end_date, description, budget, checklist)
-      values (${member.group_id}, ${location}, ${startDate}, ${endDate}, ${description}, ${budget}, ${JSON.stringify(checklist)}::jsonb)
+      insert into public.group_boards (group_id, board_name, location, start_date, end_date, description, budget, checklist)
+      values (${member.group_id}, ${boardName}, ${location}, ${startDate}, ${endDate}, ${description}, ${budget}, ${checklistPayload}::jsonb)
       on conflict (group_id)
       do update set
+        board_name = coalesce(excluded.board_name, public.group_boards.board_name),
         location = excluded.location,
         start_date = excluded.start_date,
         end_date = excluded.end_date,
@@ -84,7 +119,7 @@ export async function PUT(request: Request, context: Params) {
     `;
 
     const updated = await sqlClient`
-      select location, start_date, end_date, description, budget, checklist, updated_at
+      select board_name, location, start_date, end_date, description, budget, checklist, updated_at
       from public.group_boards
       where group_id = ${member.group_id}
       limit 1
@@ -92,14 +127,18 @@ export async function PUT(request: Request, context: Params) {
 
     const row = Array.isArray(updated) && updated.length ? updated[0] : null;
 
+    const parsed = parseChecklistAndDetails(row?.checklist);
+
     return NextResponse.json({
+      boardName: row?.board_name ?? null,
       travelInfo: {
         location: row?.location ?? null,
         startDate: row?.start_date ?? null,
         endDate: row?.end_date ?? null,
         description: row?.description ?? null,
         budget: row?.budget != null ? Number(row.budget) : null,
-        checklist: Array.isArray(row?.checklist) ? row.checklist : checklist,
+        checklist: parsed.checklist.length ? parsed.checklist : checklist,
+        details: parsed.details,
         updatedAt: row?.updated_at ?? null,
       },
     });

@@ -4,6 +4,13 @@ import { ArrowUpIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useChat, type Message } from './chat/ChatContext';
 import { getBrowserSupabase } from '../lib/supabaseClient';
 
+const isPublicRoute = (pathname: string) => {
+  if (pathname === '/' || pathname === '/login' || pathname === '/register' || pathname === '/signin') {
+    return true;
+  }
+  return pathname.startsWith('/demo') || pathname.startsWith('/u/');
+};
+
 function mapRow(row: any): Message {
   return {
     id: String(row.id),
@@ -31,18 +38,36 @@ export default function ChatWindow() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadUser = async () => {
+      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+        if (mounted) setCurrentUserId(null);
+        return;
+      }
       try {
         const res = await fetch('/api/user/me');
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (mounted) setCurrentUserId(null);
+          return;
+        }
         const json = await res.json();
         if (mounted && json?.id) setCurrentUserId(String(json.id));
       } catch (err) {
-        // ignore
+        if (mounted) setCurrentUserId(null);
       }
-    })();
+    };
+    loadUser();
+    const onAuthChanged = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.status === 'logged-out') {
+        setCurrentUserId(null);
+      } else {
+        loadUser();
+      }
+    };
+    window.addEventListener('auth:changed', onAuthChanged);
     return () => {
       mounted = false;
+      window.removeEventListener('auth:changed', onAuthChanged);
     };
   }, []);
 

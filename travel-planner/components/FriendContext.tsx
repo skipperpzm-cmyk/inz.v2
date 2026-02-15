@@ -1,7 +1,15 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { getBrowserSupabase } from '../lib/supabaseClient';
+
+const isPublicRoute = (pathname: string) => {
+  if (pathname === '/' || pathname === '/login' || pathname === '/register' || pathname === '/signin') {
+    return true;
+  }
+  return pathname.startsWith('/demo') || pathname.startsWith('/u/');
+};
 
 /**
  * State machine for friend relations
@@ -87,6 +95,10 @@ type FriendContextType = {
 const FriendContext = createContext<FriendContextType | undefined>(undefined);
 
 export function FriendProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const RETRY_DELAYS_MS = [200, 500, 1000];
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   // Wymuszaj refreshInvites po każdej zmianie currentUserId
   useEffect(() => {
@@ -452,6 +464,19 @@ export function FriendProvider({ children }: { children: ReactNode }) {
       throw new Error('Błąd akceptacji. Spróbuj ponownie lub odśwież stronę.');
     }
     setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+        useEffect(() => {
+          let mounted = true;
+          const onAuthChanged = (e: Event) => {
+            const custom = e as CustomEvent;
+            if (custom.detail?.status === 'logged-out') {
+              resetAuthBoundState();
+            } else {
+              loadCurrentUser();
+            }
+          };
+          window.addEventListener('auth:changed', onAuthChanged);
+          return () => { mounted = false; window.removeEventListener('auth:changed', onAuthChanged); };
+        }, []);
     setReadInviteIds((prev) => {
       if (!prev.has(inviteId)) return prev;
       const next = new Set(prev);
@@ -511,53 +536,85 @@ export function FriendProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const loadCurrentUser = async () => {
+  const resetAuthBoundState = () => {
+    setCurrentUserId(null);
+    setFriends([]);
+    setPendingInvites([]);
+    setSentInvites([]);
+  };
+
+  const fetchUserWithRetry = async (attempts: number) => {
+    for (let index = 0; index < attempts; index += 1) {
+      try {
+        const res = await fetch('/api/user/me', { credentials: 'include', cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (typeof data?.id === 'string') return { ok: true as const, userId: data.id as string };
+          return { ok: false as const, status: 200 };
+        }
+
+        // Retry only on transient/racy statuses.
+        if (res.status === 401 || res.status >= 500) {
+          if (index < attempts - 1) {
+            await wait(RETRY_DELAYS_MS[Math.min(index, RETRY_DELAYS_MS.length - 1)]);
+            continue;
+          }
+        }
+        return { ok: false as const, status: res.status };
+      } catch {
+        if (index < attempts - 1) {
+          await wait(RETRY_DELAYS_MS[Math.min(index, RETRY_DELAYS_MS.length - 1)]);
+          continue;
+        }
+        return { ok: false as const, status: 0 };
+      }
+    }
+
+    return { ok: false as const, status: 0 };
+  };
+
+  const loadCurrentUser = async (options?: { attempts?: number; clearOnFail?: boolean }) => {
+    const attempts = Math.max(1, options?.attempts ?? 1);
+    const clearOnFail = options?.clearOnFail ?? true;
+
+    if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+      resetAuthBoundState();
+      return;
+    }
+
     try {
-      const res = await fetch("/api/user/me", { credentials: "include", cache: "no-store" });
-      if (!res.ok) {
-        setCurrentUserId(null);
-        setFriends([]);
-        setPendingInvites([]);
-        setSentInvites([]);
+      const userRes = await fetchUserWithRetry(attempts);
+      if (!userRes.ok) {
+        if (clearOnFail) resetAuthBoundState();
         return;
       }
-      const data = await res.json();
-      if (typeof data?.id === 'string') {
-        const userId = data.id;
-        setCurrentUserId(userId);
-        await refreshFriends();
 
-        const invitesRes = await fetch('/api/friend-invites', { credentials: 'include', cache: 'no-store' });
-        if (invitesRes.ok) {
-          const invitesData = await invitesRes.json().catch(() => ([]));
-          const invites = Array.isArray(invitesData) ? (invitesData as FriendInvite[]) : [];
-          const pending = invites.filter((invite) => invite.to_user_id === userId);
-          const sent = invites.filter((invite) => invite.from_user_id === userId);
-          setPendingInvites(pending);
-          setSentInvites(sent);
-          setReadInviteIds((prev) => {
-            const pendingIds = new Set(pending.map((invite) => invite.id));
-            const next = new Set<string>();
-            prev.forEach((id) => {
-              if (pendingIds.has(id)) next.add(id);
-            });
-            return next;
+      const userId = userRes.userId;
+      setCurrentUserId(userId);
+      await refreshFriends();
+
+      const invitesRes = await fetch('/api/friend-invites', { credentials: 'include', cache: 'no-store' });
+      if (invitesRes.ok) {
+        const invitesData = await invitesRes.json().catch(() => ([]));
+        const invites = Array.isArray(invitesData) ? (invitesData as FriendInvite[]) : [];
+        const pending = invites.filter((invite) => invite.to_user_id === userId);
+        const sent = invites.filter((invite) => invite.from_user_id === userId);
+        setPendingInvites(pending);
+        setSentInvites(sent);
+        setReadInviteIds((prev) => {
+          const pendingIds = new Set(pending.map((invite) => invite.id));
+          const next = new Set<string>();
+          prev.forEach((id) => {
+            if (pendingIds.has(id)) next.add(id);
           });
-        } else {
-          setPendingInvites([]);
-          setSentInvites([]);
-        }
+          return next;
+        });
       } else {
-        setCurrentUserId(null);
-        setFriends([]);
         setPendingInvites([]);
         setSentInvites([]);
       }
     } catch {
-      setCurrentUserId(null);
-      setFriends([]);
-      setPendingInvites([]);
-      setSentInvites([]);
+      if (clearOnFail) resetAuthBoundState();
     }
   };
 
@@ -566,8 +623,22 @@ export function FriendProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const onAuthChanged = () => {
-      void loadCurrentUser();
+    if (!pathname) return;
+    if (isPublicRoute(pathname)) return;
+    void loadCurrentUser({ attempts: 2, clearOnFail: false });
+  }, [pathname]);
+
+  useEffect(() => {
+    const onAuthChanged = (event: Event) => {
+      const status = (event as CustomEvent<{ status?: string }>)?.detail?.status;
+
+      if (status === 'logged-out') {
+        resetAuthBoundState();
+        return;
+      }
+
+      // On login, cookie/session propagation can race with immediate fetches.
+      void loadCurrentUser({ attempts: 4, clearOnFail: false });
     };
     window.addEventListener('auth:changed', onAuthChanged);
     return () => {

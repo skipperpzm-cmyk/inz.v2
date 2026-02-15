@@ -73,7 +73,7 @@ export default function ProfileSettingsClient() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadUser = async () => {
       try {
         const res = await fetch('/api/user/me', { credentials: 'include' });
         if (!res.ok) return;
@@ -90,8 +90,21 @@ export default function ProfileSettingsClient() {
       } catch (e) {
         // ignore
       }
-    })();
-    return () => { mounted = false; };
+    };
+    loadUser();
+    const onAuthChanged = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.status === 'logged-out') {
+        setPseudonim('');
+        setAvatarUrl('');
+        setPublicId(null);
+        setBackgroundUrl(null);
+      } else {
+        loadUser();
+      }
+    };
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => { mounted = false; window.removeEventListener('auth:changed', onAuthChanged); };
   }, []);
 
   // Listen for external updates to the public id (keeps UI in sync if changed elsewhere)

@@ -16,11 +16,10 @@ type UserProp = {
   avatarUrl?: string | null;
 };
 
-function PrimaryNewTrip({ disabled }: { disabled?: boolean }) {
-  const router = useRouter();
+function PrimaryNewTrip({ disabled, onNavigate }: { disabled?: boolean; onNavigate: () => void }) {
   const handleClick = () => {
     if (disabled) return;
-    router.push('/dashboard/newtrip');
+    onNavigate();
   };
 
   return (
@@ -44,6 +43,13 @@ type SidebarProps = {
   onNavigate?: () => void;
   user?: UserProp | null;
   readOnly?: boolean;
+};
+
+const isPublicRoute = (pathname: string) => {
+  if (pathname === '/' || pathname === '/login' || pathname === '/register' || pathname === '/signin') {
+    return true;
+  }
+  return pathname.startsWith('/demo') || pathname.startsWith('/u/');
 };
 
 export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarProps) {
@@ -70,7 +76,14 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
   // Ensure client-side shows the latest username after login (client nav may cause a race).
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadUser = async () => {
+      if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+        if (mounted) {
+          setDisplayName('');
+          setAvatarUrl(null);
+        }
+        return;
+      }
       try {
         const res = await fetch('/api/user/me');
         if (!res.ok) return;
@@ -83,9 +96,20 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
       } catch (err) {
         // ignore
       }
-    })();
-    return () => { mounted = false; };
-  }, []);
+    };
+    if (user) loadUser();
+    const onAuthChanged = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.status === 'logged-out') {
+        setDisplayName('');
+        setAvatarUrl(null);
+      } else {
+        loadUser();
+      }
+    };
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => { mounted = false; window.removeEventListener('auth:changed', onAuthChanged); };
+  }, [user]);
 
   React.useEffect(() => {
     function onAvatarUpdate(e: Event) {
@@ -215,6 +239,35 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
     { href: '/dashboard/groups', label: 'Grupy' },
   ];
 
+  const isActiveHref = React.useCallback(
+    (href: string) => pathname === href || (href !== '/dashboard' && Boolean(pathname?.startsWith(href))),
+    [pathname]
+  );
+
+  const navigateWithRefresh = React.useCallback(
+    (href: string) => {
+      onNavigate?.();
+      if (isActiveHref(href)) {
+        router.refresh();
+        return;
+      }
+
+      router.push(href);
+      setTimeout(() => router.refresh(), 0);
+    },
+    [isActiveHref, onNavigate, router]
+  );
+
+  const handleNavClick = React.useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      if (readOnly) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+      event.preventDefault();
+      navigateWithRefresh(href);
+    },
+    [navigateWithRefresh, readOnly]
+  );
+
   return (
     <>
     <nav className="flex flex-col w-72 h-full p-4 bg-white/5 backdrop-blur-2xl shadow-glass rounded-2xl">
@@ -288,7 +341,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
       <div className="my-2 h-px bg-white/6 rounded-full" />
 
       <div className="px-2 mb-3">
-        <PrimaryNewTrip disabled={readOnly} />
+        <PrimaryNewTrip disabled={readOnly} onNavigate={() => navigateWithRefresh('/dashboard/newtrip')} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 space-y-4">
@@ -297,7 +350,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
             <div className="text-xs uppercase tracking-widest text-white/40">Podstawy</div>
           </div>
           <ul className="space-y-1">
-            {coreNav.map((it) => renderItem(it, pathname, onNavigate, readOnly))}
+            {coreNav.map((it) => renderItem(it, pathname, onNavigate, readOnly, handleNavClick))}
           </ul>
         </div>
 
@@ -308,7 +361,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
             <div className="text-xs uppercase tracking-widest text-white/40">Organizacja</div>
           </div>
           <ul className="space-y-1">
-            {orgNav.map((it) => renderItem(it, pathname, onNavigate, readOnly))}
+            {orgNav.map((it) => renderItem(it, pathname, onNavigate, readOnly, handleNavClick))}
           </ul>
         </div>
 
@@ -319,7 +372,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
             <div className="text-xs uppercase tracking-widest text-white/40">Biblioteka</div>
           </div>
           <ul className="space-y-1">
-            {libraryNav.map((it) => renderItem(it, pathname, onNavigate, readOnly))}
+            {libraryNav.map((it) => renderItem(it, pathname, onNavigate, readOnly, handleNavClick))}
           </ul>
         </div>
 
@@ -330,7 +383,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
             <div className="text-xs uppercase tracking-widest text-white/40">System</div>
           </div>
           <ul className="space-y-1">
-            {systemNav.map((it) => renderItem(it, pathname, onNavigate, readOnly))}
+            {systemNav.map((it) => renderItem(it, pathname, onNavigate, readOnly, handleNavClick))}
           </ul>
         </div>
         <div className="my-2 h-px bg-white/6 rounded-full" />
@@ -359,7 +412,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
                   const active = pathname === it.href || (it.href !== '/dashboard/groups' && pathname?.startsWith(it.href));
                   return (
                     <li key={it.href}>
-                      <Link href={it.href} onClick={() => onNavigate?.()} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${active ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'text-slate-200 hover:text-white hover:bg-indigo-500/10'}`}>
+                      <Link href={it.href} onClick={(event) => handleNavClick(event, it.href)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${active ? 'bg-indigo-500/20 text-indigo-100 font-semibold' : 'text-slate-200 hover:text-white hover:bg-indigo-500/10'}`}>
                         {it.label}
                       </Link>
                     </li>
@@ -379,6 +432,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
                 <Link
                   href="/dashboard/settings/profile"
                   aria-label="Ustawienia"
+                  onClick={(event) => handleNavClick(event, '/dashboard/settings/profile')}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/6 border border-white/8 text-sm text-white hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/40 cursor-pointer"
                 >
                   {/* Heroicons Cog (outline) */}
@@ -435,7 +489,13 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
   );
 }
 
-function renderItem(it: { href: string; label: string }, pathname?: string | null, onNavigate?: () => void, readOnly?: boolean) {
+function renderItem(
+  it: { href: string; label: string },
+  pathname: string | null | undefined,
+  onNavigate: (() => void) | undefined,
+  readOnly: boolean | undefined,
+  onNavClick: (event: React.MouseEvent<HTMLAnchorElement>, href: string) => void
+) {
   const active = pathname === it.href || (it.href !== '/dashboard' && pathname?.startsWith(it.href));
   const IconComp = getIconForHref(it.href);
   const baseClasses = `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition transform-gpu focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
@@ -462,7 +522,7 @@ function renderItem(it: { href: string; label: string }, pathname?: string | nul
 
   return (
     <li key={it.href}>
-      <Link href={it.href} onClick={() => onNavigate?.()} className={`${baseClasses} cursor-pointer`}>
+      <Link href={it.href} onClick={(event) => onNavClick(event, it.href)} className={`${baseClasses} cursor-pointer`}>
         {content}
       </Link>
     </li>

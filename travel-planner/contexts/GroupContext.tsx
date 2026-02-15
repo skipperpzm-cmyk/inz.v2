@@ -1,11 +1,19 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { usePathname } from "next/navigation";
 // Shared constant: max avatar file size in bytes (e.g. 2MB)
 export const GROUP_AVATAR_MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { getBrowserSupabase } from "../lib/supabaseClient";
 import type { Group, GroupInvite, GroupMember } from "../types/group";
+
+const isPublicRoute = (pathname: string) => {
+  if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/signin") {
+    return true;
+  }
+  return pathname.startsWith("/demo") || pathname.startsWith("/u/");
+};
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -255,6 +263,7 @@ export type GroupContextValue = {
 const GroupContext = createContext<GroupContextValue | null>(null);
 
 export function GroupProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [state, dispatch] = useReducer(reducer, initialState);
   const membersRequestedRef = useRef<Set<string>>(new Set());
   const membersByGroupIdRef = useRef<State["membersByGroupId"]>({});
@@ -456,6 +465,13 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loadUser = useCallback(async () => {
+    if (typeof window !== "undefined" && isPublicRoute(window.location.pathname)) {
+      dispatch({ type: "SET_USER", payload: null });
+      dispatch({ type: "GROUPS_SUCCESS", payload: [] });
+      dispatch({ type: "INVITES_SUCCESS", payload: [] });
+      return;
+    }
+
     try {
       const res = await fetch("/api/user/me", { credentials: "include", cache: "no-store" });
       if (!res.ok) {
@@ -481,19 +497,31 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshGroups, refreshInvites]);
 
+  // Listen for logout event to clear user state
+  React.useEffect(() => {
+    const onAuthChanged = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail?.status === 'logged-out') {
+        dispatch({ type: "SET_USER", payload: null });
+        dispatch({ type: "GROUPS_SUCCESS", payload: [] });
+        dispatch({ type: "INVITES_SUCCESS", payload: [] });
+      } else {
+        void loadUser();
+      }
+    };
+    window.addEventListener('auth:changed', onAuthChanged);
+    return () => window.removeEventListener('auth:changed', onAuthChanged);
+  }, [loadUser]);
+
   useEffect(() => {
     void loadUser();
   }, [loadUser]);
 
   useEffect(() => {
-    const onAuthChanged = () => {
-      void loadUser();
-    };
-    window.addEventListener("auth:changed", onAuthChanged);
-    return () => {
-      window.removeEventListener("auth:changed", onAuthChanged);
-    };
-  }, [loadUser]);
+    if (!pathname) return;
+    if (isPublicRoute(pathname)) return;
+    void loadUser();
+  }, [loadUser, pathname]);
 
   useEffect(() => {
     if (!state.currentUserId) return;

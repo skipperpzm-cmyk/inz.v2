@@ -58,12 +58,13 @@ export default function BoardsClient() {
                     <img src={board.groupAvatarUrl} alt={board.groupName} className="w-11 h-11 rounded-full object-cover border border-white/15" />
                   ) : (
                     <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold text-sm">
-                      {board.groupName.slice(0, 2).toUpperCase()}
+                      {board.boardName.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="text-white font-medium truncate">{board.groupName}</div>
-                    <div className="text-xs text-white/60 mt-1">{board.memberCount} członków</div>
+                    <div className="text-white font-medium truncate">{board.boardName}</div>
+                    <div className="text-xs text-white/60 mt-1">Grupa: {board.groupName}</div>
+                    <div className="text-xs text-white/50 mt-0.5">{board.memberCount} członków</div>
                   </div>
                 </div>
                 {board.newPostsCount > 0 && (

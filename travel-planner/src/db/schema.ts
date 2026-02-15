@@ -1,4 +1,5 @@
-import { boolean, date, index, integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const boardItemStatus = pgEnum('board_item_status', ['todo', 'doing', 'done']);
 
@@ -155,6 +156,101 @@ export const addFriendLogs = pgTable(
   })
 );
 
+export const groups = pgTable(
+  'groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    isPrivate: boolean('is_private').notNull().default(false),
+    createdBy: uuid('created_by').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    avatarUrl: text('avatar_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    slugUnique: uniqueIndex('idx_groups_slug').on(table.slug),
+    createdByIdx: index('idx_groups_created_by').on(table.createdBy),
+  })
+);
+
+export const groupMembers = pgTable(
+  'group_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('member'),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    groupUserUnique: uniqueIndex('idx_group_members_group_user').on(table.groupId, table.userId),
+    groupIdIdx: index('idx_group_members_group_id').on(table.groupId),
+  })
+);
+
+export const groupInvites = pgTable(
+  'group_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+    fromUserId: uuid('from_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    toUserId: uuid('to_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    toUserIdx: index('idx_group_invites_to_user_id').on(table.toUserId),
+    statusIdx: index('idx_group_invites_status').on(table.status),
+  })
+);
+
+export const groupBoards = pgTable('group_boards', {
+  groupId: uuid('group_id').primaryKey().references(() => groups.id, { onDelete: 'cascade' }),
+  boardName: text('board_name'),
+  location: text('location'),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  description: text('description'),
+  budget: numeric('budget', { precision: 12, scale: 2 }),
+  checklist: jsonb('checklist').notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const groupPosts = pgTable(
+  'group_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    attachments: jsonb('attachments').notNull().default(sql`'[]'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    groupCreatedAtIdx: index('idx_group_posts_group_id_created_at').on(table.groupId, table.createdAt),
+  })
+);
+
+export const groupComments = pgTable(
+  'group_comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id').notNull().references(() => groupPosts.id, { onDelete: 'cascade' }),
+    groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    postCreatedAtIdx: index('idx_group_comments_post_id_created_at').on(table.postId, table.createdAt),
+    groupCreatedAtIdx: index('idx_group_comments_group_id_created_at').on(table.groupId, table.createdAt),
+  })
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type InsertUserRow = typeof users.$inferInsert;
 export type TripRow = typeof trips.$inferSelect;
@@ -177,3 +273,15 @@ export type UserFriendRow = typeof userFriends.$inferSelect;
 export type InsertUserFriendRow = typeof userFriends.$inferInsert;
 export type AddFriendLogRow = typeof addFriendLogs.$inferSelect;
 export type InsertAddFriendLogRow = typeof addFriendLogs.$inferInsert;
+export type GroupRow = typeof groups.$inferSelect;
+export type InsertGroupRow = typeof groups.$inferInsert;
+export type GroupMemberRow = typeof groupMembers.$inferSelect;
+export type InsertGroupMemberRow = typeof groupMembers.$inferInsert;
+export type GroupInviteRow = typeof groupInvites.$inferSelect;
+export type InsertGroupInviteRow = typeof groupInvites.$inferInsert;
+export type GroupBoardRow = typeof groupBoards.$inferSelect;
+export type InsertGroupBoardRow = typeof groupBoards.$inferInsert;
+export type GroupPostRow = typeof groupPosts.$inferSelect;
+export type InsertGroupPostRow = typeof groupPosts.$inferInsert;
+export type GroupCommentRow = typeof groupComments.$inferSelect;
+export type InsertGroupCommentRow = typeof groupComments.$inferInsert;

@@ -1,3 +1,26 @@
+/* Wymusza zawsze widoczny scroll bar na całej aplikacji */
+html {
+  overflow-y: scroll !important;
+}
+/* Usuwa poświatę z dodatkowych kontrolek Google Maps */
+.gm-inset-map,
+.gm-inset-map:focus,
+.gm-inset-map:active,
+.gm-inset-map:hover,
+.gm-inset-light,
+.gm-inset-light:focus,
+.gm-inset-light:active,
+.gm-inset-light:hover {
+  box-shadow: none !important;
+  background: none !important;
+}
+/* Usuwa poświatę z kontrolek Google Maps */
+.gm-control-active,
+.gm-control-active:focus,
+.gm-control-active:active,
+.gm-control-active:hover {
+  box-shadow: none !important;
+}
 @keyframes slidein-toast {
   0% {
     opacity: 0;
@@ -344,8 +367,31 @@ body {
 
 .dashboard-main input,
 .dashboard-main textarea,
-.dashboard-main select {
-  @apply bg-white/5 border-white/10 text-white;
+.dashboard-main select,
+.right-sidebar-panel input,
+.right-sidebar-panel textarea,
+.right-sidebar-panel select {
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+.dashboard-main input::placeholder,
+.dashboard-main textarea::placeholder,
+.right-sidebar-panel input::placeholder,
+.right-sidebar-panel textarea::placeholder {
+  color: rgba(203, 213, 225, 0.85) !important;
+}
+
+.right-sidebar-panel input:focus,
+.right-sidebar-panel textarea:focus,
+.right-sidebar-panel select:focus,
+.right-sidebar-panel input:focus-visible,
+.right-sidebar-panel textarea:focus-visible,
+.right-sidebar-panel select:focus-visible {
+  outline: none !important;
+  border-color: rgba(120, 113, 108, 0.55) !important;
+  box-shadow: 0 0 0 2px rgba(120, 113, 108, 0.20) !important;
 }
 
 /* Buttons inside the dashboard should support hover fills and transitions. */
@@ -638,6 +684,177 @@ body {
   transition: all 300ms ease-in-out;
   -webkit-transition: all 300ms ease-in-out;
   will-change: transform, filter, box-shadow, background;
+}
+
+/* Board header edit controls: hard override over dashboard-wide button theme
+   to prevent indigo/purple colors from leaking in via `.dashboard-main button...` rules. */
+.dashboard-main button.board-inline-edit-btn,
+.dashboard-main button.board-country-trigger,
+.dashboard-main button.board-country-option {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+.dashboard-main button.board-inline-edit-btn {
+  border: 0 !important;
+  color: rgba(255, 255, 255, 0.68) !important;
+  background: transparent !important;
+  border-width: 0 !important;
+  border-radius: 0 !important;
+}
+
+.dashboard-main button.board-inline-edit-btn:hover,
+.dashboard-main button.board-inline-edit-btn:focus,
+.dashboard-main button.board-inline-edit-btn:focus-visible,
+.dashboard-main button.board-inline-edit-btn:active {
+  border: 0 !important;
+  color: #ffffff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.dashboard-main button.board-inline-edit-btn::before,
+.dashboard-main button.board-inline-edit-btn::after,
+.dashboard-main button.board-country-trigger::before,
+.dashboard-main button.board-country-trigger::after,
+.dashboard-main button.board-country-option::before,
+.dashboard-main button.board-country-option::after {
+  content: none !important;
+  display: none !important;
+}
+
+.dashboard-main button.board-country-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-width: 1px !important;
+  color: rgba(255, 255, 255, 0.90) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.dashboard-main button.board-country-trigger:hover,
+.dashboard-main button.board-country-trigger:focus,
+.dashboard-main button.board-country-trigger:focus-visible,
+.dashboard-main button.board-country-trigger:active {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  background-color: rgba(0, 0, 0, 0.70) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.dashboard-main .board-country-menu {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+.dashboard-main button.board-country-option {
+  border: 0 !important;
+  color: #e2e8f0 !important;
+  background-color: transparent !important;
+}
+
+.dashboard-main button.board-country-option:hover,
+.dashboard-main button.board-country-option:focus,
+.dashboard-main button.board-country-option:focus-visible,
+.dashboard-main button.board-country-option:active {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.dashboard-main input.board-country-search {
+  border: 1px solid rgba(71, 85, 105, 0.95) !important;
+  color: #f1f5f9 !important;
+  background-color: #0f172a !important;
+}
+
+.dashboard-main input.board-country-search:focus,
+.dashboard-main input.board-country-search:focus-visible {
+  border-color: rgba(148, 163, 184, 0.9) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Country dropdown theme (global, also for portal rendering outside .dashboard-main) */
+.board-country-menu {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.board-country-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.90) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  cursor: pointer;
+}
+
+.board-country-trigger:hover,
+.board-country-trigger:focus,
+.board-country-trigger:focus-visible,
+.board-country-trigger:active {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  background-color: rgba(0, 0, 0, 0.70) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.board-country-option {
+  color: #e2e8f0 !important;
+  background-color: transparent !important;
+  cursor: pointer;
+}
+
+.board-country-option:hover,
+.board-country-option:focus,
+.board-country-option:focus-visible,
+.board-country-option:active {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.board-country-search {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  caret-color: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+.board-country-search:focus,
+.board-country-search:focus-visible {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background-color: rgba(0, 0, 0, 0.70) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.board-country-search::placeholder {
+  color: rgba(203, 213, 225, 0.85) !important;
+}
+
+.board-country-search:-webkit-autofill,
+.board-country-search:-webkit-autofill:hover,
+.board-country-search:-webkit-autofill:focus,
+.board-country-search:-webkit-autofill:active {
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.60) inset !important;
+  box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.60) inset !important;
+  caret-color: rgba(255, 255, 255, 0.92) !important;
 }
 
 /* Keyboard focus styling: accessible but no browser outline */
