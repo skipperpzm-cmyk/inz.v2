@@ -1761,6 +1761,10 @@ const TravelInfoSidebar = React.memo(function TravelInfoSidebar({
 });
 
 export default function BoardDetailClient({ groupId, boardId }: { groupId: string; boardId: string }) {
+  if (process.env.NODE_ENV === 'development') {
+    console.count('BoardDetailClient render');
+  }
+
   const router = useRouter();
   const toast = useToast();
   const {

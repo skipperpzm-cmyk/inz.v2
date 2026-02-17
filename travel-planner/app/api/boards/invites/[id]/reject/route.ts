@@ -36,7 +36,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
 
     const inviteRows = (inviteRes as any).rows ?? inviteRes;
     const invite = Array.isArray(inviteRows) && inviteRows.length > 0 ? inviteRows[0] : null;
-    if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+    if (!invite) return NextResponse.json({ error: 'Zaproszenie wygasło' }, { status: 404 });
 
     await (db as any).execute(sql`
       update public.board_invites

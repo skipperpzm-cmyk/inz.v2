@@ -95,6 +95,10 @@ type FriendContextType = {
 const FriendContext = createContext<FriendContextType | undefined>(undefined);
 
 export function FriendProvider({ children }: { children: ReactNode }) {
+  if (process.env.NODE_ENV === 'development') {
+    console.count('FriendProvider render');
+  }
+
   const pathname = usePathname();
   const RETRY_DELAYS_MS = [200, 500, 1000];
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -464,19 +468,6 @@ export function FriendProvider({ children }: { children: ReactNode }) {
       throw new Error('Błąd akceptacji. Spróbuj ponownie lub odśwież stronę.');
     }
     setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
-        useEffect(() => {
-          let mounted = true;
-          const onAuthChanged = (e: Event) => {
-            const custom = e as CustomEvent;
-            if (custom.detail?.status === 'logged-out') {
-              resetAuthBoundState();
-            } else {
-              loadCurrentUser();
-            }
-          };
-          window.addEventListener('auth:changed', onAuthChanged);
-          return () => { mounted = false; window.removeEventListener('auth:changed', onAuthChanged); };
-        }, []);
     setReadInviteIds((prev) => {
       if (!prev.has(inviteId)) return prev;
       const next = new Set(prev);

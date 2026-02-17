@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Button from "../ui/button";
 import { getBrowserSupabase } from "@/lib/supabaseClient";
+import { CheckIcon, TrashIcon } from "@heroicons/react/24/outline";
+import Tooltip from "../Tooltip";
 
 type NotificationItem = {
   id: string;
@@ -29,12 +30,17 @@ type NotificationResponse = {
 };
 
 export default function NotificationsPageClient() {
+  const EXIT_ANIMATION_MS = 240;
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [exitingIds, setExitingIds] = useState<string[]>([]);
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,8 +49,10 @@ export default function NotificationsPageClient() {
       const res = await fetch("/api/notifications?limit=100", { credentials: "include", cache: "no-store" });
       if (!res.ok) throw new Error("Nie udało się pobrać powiadomień");
       const data = (await res.json()) as NotificationResponse;
-      setItems(Array.isArray(data?.items) ? data.items : []);
+      const nextItems = Array.isArray(data?.items) ? data.items : [];
+      setItems(nextItems);
       setUnreadCount(Number(data?.unreadCount ?? 0));
+      setSelectedIds((prev) => prev.filter((id) => nextItems.some((item) => item.id === id)));
     } catch (err) {
       if (err instanceof Error && /aborted|ECONNRESET/i.test(err.message)) {
         return;
@@ -145,6 +153,38 @@ export default function NotificationsPageClient() {
     }
   }, [load]);
 
+  const deleteNotifications = useCallback(async (ids: string[]) => {
+    const validIds = ids.map((id) => String(id).trim()).filter(Boolean);
+    if (validIds.length === 0 || deleteBusy) return;
+
+    setDeleteBusy(true);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: validIds }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json?.error || 'Nie udało się usunąć powiadomień');
+      }
+
+      setExitingIds((prev) => Array.from(new Set([...prev, ...validIds])));
+      await new Promise((resolve) => setTimeout(resolve, EXIT_ANIMATION_MS));
+
+      setItems((prev) => prev.filter((item) => !validIds.includes(item.id)));
+      setSelectedIds((prev) => prev.filter((id) => !validIds.includes(id)));
+      setExitingIds((prev) => prev.filter((id) => !validIds.includes(id)));
+      await load();
+    } catch (err) {
+      setExitingIds((prev) => prev.filter((id) => !validIds.includes(id)));
+      setError(err instanceof Error ? err.message : 'Nie udało się usunąć powiadomień');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [EXIT_ANIMATION_MS, deleteBusy, load]);
+
   const getInviteId = useCallback((item: NotificationItem) => {
     if (item.type === 'board_invite') {
       return String(item.payload?.inviteId ?? item.payload?.boardId ?? item.entityId ?? '');
@@ -176,18 +216,31 @@ export default function NotificationsPageClient() {
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          throw new Error(json?.error || "Operacja nie powiodła się");
+          const errorText = typeof json?.error === 'string' ? json.error : '';
+          const isExpired = res.status === 404 || /wygas|expired/i.test(errorText);
+          if (isExpired) {
+            await deleteNotifications([item.id]);
+            return;
+          }
+          throw new Error(errorText || "Operacja nie powiodła się");
         }
 
-        await fetch("/api/notifications", {
-          method: "PATCH",
+        await fetch('/api/notifications', {
+          method: 'DELETE',
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: [item.id] }),
         });
 
+        setExitingIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+        await new Promise((resolve) => setTimeout(resolve, EXIT_ANIMATION_MS));
+        setItems((prev) => prev.filter((row) => row.id !== item.id));
+        setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+        setExitingIds((prev) => prev.filter((id) => id !== item.id));
+
         await load();
       } catch (err) {
+        setExitingIds((prev) => prev.filter((id) => id !== item.id));
         if (err instanceof Error && /aborted|ECONNRESET/i.test(err.message)) {
           return;
         }
@@ -196,12 +249,16 @@ export default function NotificationsPageClient() {
         setActionBusyId(null);
       }
     },
-    [getInviteId, load]
+    [EXIT_ANIMATION_MS, deleteNotifications, getInviteId, load]
   );
 
   const grouped = useMemo(() => {
     return items;
   }, [items]);
+
+  const allVisibleIds = useMemo(() => grouped.map((item) => item.id), [grouped]);
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedIds.includes(id));
+  const selectedCount = selectedIds.length;
 
   return (
     <div className="space-y-4 lg:pl-6">
@@ -210,13 +267,80 @@ export default function NotificationsPageClient() {
           <h1 className="text-2xl font-semibold text-white">Powiadomienia</h1>
           <p className="text-sm text-white/60 mt-1">Nieprzeczytane: {unreadCount}</p>
         </div>
-        <Button type="button" variant="secondary" onClick={() => void markAllRead()} disabled={unreadCount === 0}>
-          Oznacz wszystkie jako przeczytane
-        </Button>
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-flex"
+            onMouseEnter={(e) => {
+              const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+              setTooltip({ text: 'Oznacz wszystkie jako przeczytane', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+            }}
+            onMouseLeave={() => setTooltip(null)}
+          >
+            <button
+              type="button"
+              aria-label="Oznacz wszystkie jako przeczytane"
+              className="app-icon-btn text-emerald-200 hover:text-emerald-100"
+              onClick={() => void markAllRead()}
+              onFocus={(e) => {
+                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                setTooltip({ text: 'Oznacz wszystkie jako przeczytane', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+              }}
+              onBlur={() => setTooltip(null)}
+              disabled={unreadCount === 0 || deleteBusy}
+            >
+              <CheckIcon className="h-4 w-4" aria-hidden />
+            </button>
+          </span>
+          <span
+            className="inline-flex"
+            onMouseEnter={(e) => {
+              const rect = (e.currentTarget as HTMLSpanElement).getBoundingClientRect();
+              setTooltip({ text: 'Usuń zaznaczone', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+            }}
+            onMouseLeave={() => setTooltip(null)}
+          >
+            <button
+              type="button"
+              aria-label="Usuń zaznaczone powiadomienia"
+              className="app-icon-btn text-rose-200 hover:text-rose-100"
+              onClick={() => void deleteNotifications(selectedIds)}
+              onFocus={(e) => {
+                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                setTooltip({ text: 'Usuń zaznaczone', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+              }}
+              onBlur={() => setTooltip(null)}
+              disabled={selectedCount === 0 || deleteBusy}
+            >
+              <TrashIcon className="h-4 w-4" aria-hidden />
+            </button>
+          </span>
+        </div>
       </div>
 
+      {grouped.length > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedIds(allVisibleIds);
+              } else {
+                setSelectedIds([]);
+              }
+            }}
+            className="h-4 w-4 rounded border-white/30 bg-transparent text-emerald-500 focus:ring-emerald-500"
+          />
+          <span className="text-xs text-white/75">Zaznacz wszystkie</span>
+          <span className="ml-auto text-xs text-white/50">Zaznaczone: {selectedCount}</span>
+        </div>
+      )}
+
       {loading ? (
-        <div className="text-sm text-white/60">Ładowanie powiadomień…</div>
+        <div className="flex items-center justify-center py-3">
+          <span className="inline-block animate-spin rounded-full border-4 border-emerald-400 border-t-transparent w-8 h-8" aria-hidden />
+          <span className="sr-only">Ładowanie powiadomień</span>
+        </div>
       ) : error ? (
         <div className="text-sm text-red-300">{error}</div>
       ) : grouped.length === 0 ? (
@@ -231,40 +355,76 @@ export default function NotificationsPageClient() {
             return (
               <div
                 key={item.id}
-                className={`rounded-lg border px-3 py-3 ${item.readAt ? "border-white/10 bg-white/5" : "border-indigo-300/30 bg-indigo-500/10"}`}
+                className={`rounded-lg border px-3 py-3 ${item.readAt ? "border-white/10 bg-white/5" : "border-cyan-300/30 bg-cyan-500/10"} ${exitingIds.includes(item.id) ? 'animate-zoomOut pointer-events-none' : ''}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">{item.title}</div>
-                    <div className="text-xs text-white/60 mt-0.5">{item.message || ""}</div>
-                    <div className="text-[11px] text-white/45 mt-1 truncate">{actorName}</div>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(item.id)}
+                      onChange={(e) => {
+                        setSelectedIds((prev) => {
+                          if (e.target.checked) {
+                            if (prev.includes(item.id)) return prev;
+                            return [...prev, item.id];
+                          }
+                          return prev.filter((id) => id !== item.id);
+                        });
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-white/30 bg-transparent text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-white truncate">{item.title}</div>
+                      <div className="text-xs text-white/60 mt-0.5">{item.message || ""}</div>
+                      <div className="text-[11px] text-white/45 mt-1 truncate">{actorName}</div>
+                    </div>
                   </div>
-                  {item.readAt ? (
-                    <span className="text-[11px] text-white/40">Przeczytane</span>
-                  ) : (
-                    <span className="text-[11px] text-indigo-200">Nowe</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="Usuń powiadomienie"
+                      disabled={deleteBusy}
+                      onClick={() => void deleteNotifications([item.id])}
+                      onMouseEnter={(e) => {
+                        const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                        setTooltip({ text: 'Usuń powiadomienie', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
+                      onFocus={(e) => {
+                        const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                        setTooltip({ text: 'Usuń powiadomienie', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                      }}
+                      onBlur={() => setTooltip(null)}
+                      className="app-icon-btn text-rose-200 hover:text-rose-100"
+                    >
+                      <TrashIcon className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                    {item.readAt ? (
+                      <span className="text-[11px] text-white/40">Przeczytane</span>
+                    ) : (
+                      <span className="text-[11px] text-cyan-200">Nowe</span>
+                    )}
+                  </div>
                 </div>
 
                 {canAct && (
                   <div className="mt-3 flex items-center gap-2">
-                    <Button
+                    <button
                       type="button"
-                      variant="primary"
-                      className="app-text-btn-gradient"
+                      className="app-text-btn-accept inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
                       disabled={pending}
                       onClick={() => void runInviteAction(item, "accept")}
                     >
                       {pending ? "Przetwarzanie…" : "Akceptuj"}
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                       type="button"
-                      variant="danger"
+                      className="app-text-btn-reject inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
                       disabled={pending}
                       onClick={() => void runInviteAction(item, "reject")}
                     >
                       Odrzuć
-                    </Button>
+                    </button>
                   </div>
                 )}
               </div>
@@ -272,6 +432,7 @@ export default function NotificationsPageClient() {
           })}
         </div>
       )}
+      {tooltip && <Tooltip text={tooltip.text} x={tooltip.x} y={tooltip.y} />}
     </div>
   );
 }

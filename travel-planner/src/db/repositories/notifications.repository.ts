@@ -147,9 +147,41 @@ export async function markNotificationsRead(userId: string, notificationIds?: st
     return;
   }
 
+  const idParams = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `
+  );
+
   await (db as any).execute(sql`
     update public.notifications
     set read_at = now()
-    where user_id = ${userId} and id::text = any(${ids}) and read_at is null
+    where user_id = ${userId}
+      and id::text in (${idParams})
+      and read_at is null
   `);
+}
+
+export async function deleteNotifications(userId: string, notificationIds: string[]) {
+  const db = requireDb();
+  const ids = Array.isArray(notificationIds)
+    ? notificationIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+
+  if (ids.length === 0) return { deletedCount: 0 };
+
+  const idParams = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `
+  );
+
+  const res = await (db as any).execute(sql`
+    delete from public.notifications
+    where user_id = ${userId}
+      and id::text in (${idParams})
+    returning id
+  `);
+
+  const rows = (res as any).rows ?? res;
+  const deletedCount = Array.isArray(rows) ? rows.length : 0;
+  return { deletedCount };
 }

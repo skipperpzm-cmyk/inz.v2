@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import LogoutButton from './layout/LogoutButton';
-import { Cog6ToothIcon, PlusIcon, BellIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon, PlusIcon, BellIcon, ChevronRightIcon, CheckIcon, TrashIcon } from '@heroicons/react/24/outline';
+import Tooltip from './Tooltip';
 import { getIconForHref } from './icons';
 import { profileHref } from '../lib/profileUrl';
 import { getBrowserSupabase } from '../lib/supabaseClient';
@@ -65,6 +66,7 @@ const isPublicRoute = (pathname: string) => {
 };
 
 export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarProps) {
+  const EXIT_ANIMATION_MS = 240;
   const pathname = usePathname();
   const router = useRouter();
   const [groupsOpen, setGroupsOpen] = React.useState(false);
@@ -79,6 +81,10 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
   const [notificationsLoading, setNotificationsLoading] = React.useState(false);
   const [notificationsUnread, setNotificationsUnread] = React.useState(0);
   const [notificationActionPendingId, setNotificationActionPendingId] = React.useState<string | null>(null);
+  const [notificationDeletePendingId, setNotificationDeletePendingId] = React.useState<string | null>(null);
+  const [exitingNotificationIds, setExitingNotificationIds] = React.useState<string[]>([]);
+  const [markAllPending, setMarkAllPending] = React.useState(false);
+  const [tooltip, setTooltip] = React.useState<{ text: string; x: number; y: number } | null>(null);
 
   const loadNotifications = React.useCallback(async () => {
     if (!user) {
@@ -125,24 +131,96 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
           method: 'POST',
           credentials: 'include',
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          const errorText = typeof json?.error === 'string' ? json.error : '';
+          const isExpired = res.status === 404 || /wygas|expired/i.test(errorText);
+
+          if (isExpired) {
+            await fetch('/api/notifications', {
+              method: 'DELETE',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: [item.id] }),
+            });
+
+            setExitingNotificationIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+            await new Promise((resolve) => setTimeout(resolve, EXIT_ANIMATION_MS));
+            setNotifications((prev) => prev.filter((entry) => entry.id !== item.id));
+            setExitingNotificationIds((prev) => prev.filter((id) => id !== item.id));
+            await loadNotifications();
+          }
+          return;
+        }
 
         await fetch('/api/notifications', {
-          method: 'PATCH',
+          method: 'DELETE',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: [item.id] }),
         });
 
+        setExitingNotificationIds((prev) => (prev.includes(item.id) ? prev : [...prev, item.id]));
+        await new Promise((resolve) => setTimeout(resolve, EXIT_ANIMATION_MS));
+        setNotifications((prev) => prev.filter((entry) => entry.id !== item.id));
+        setExitingNotificationIds((prev) => prev.filter((id) => id !== item.id));
+
         await loadNotifications();
       } catch {
+        setExitingNotificationIds((prev) => prev.filter((id) => id !== item.id));
         // ignore transient network errors; list will refresh via realtime/poll
       } finally {
         setNotificationActionPendingId(null);
       }
     },
-    [getNotificationInviteId, loadNotifications, notificationActionPendingId]
+    [EXIT_ANIMATION_MS, getNotificationInviteId, loadNotifications, notificationActionPendingId]
   );
+
+  const handleMarkAllRead = React.useCallback(async () => {
+    if (markAllPending) return;
+    const unreadIds = notifications.filter((item) => !item.readAt).map((item) => item.id);
+    if (unreadIds.length === 0) return;
+
+    setMarkAllPending(true);
+    try {
+      await fetch('/api/notifications', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: unreadIds }),
+      });
+      await loadNotifications();
+    } catch {
+      // ignore
+    } finally {
+      setMarkAllPending(false);
+    }
+  }, [loadNotifications, markAllPending, notifications]);
+
+  const handleDeleteNotification = React.useCallback(async (notificationId: string) => {
+    if (!notificationId || notificationDeletePendingId) return;
+    setNotificationDeletePendingId(notificationId);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [notificationId] }),
+      });
+      if (!res.ok) return;
+
+      setExitingNotificationIds((prev) => (prev.includes(notificationId) ? prev : [...prev, notificationId]));
+      await new Promise((resolve) => setTimeout(resolve, EXIT_ANIMATION_MS));
+      setNotifications((prev) => prev.filter((entry) => entry.id !== notificationId));
+      setExitingNotificationIds((prev) => prev.filter((id) => id !== notificationId));
+      await loadNotifications();
+    } catch {
+      setExitingNotificationIds((prev) => prev.filter((id) => id !== notificationId));
+      // ignore
+    } finally {
+      setNotificationDeletePendingId(null);
+    }
+  }, [EXIT_ANIMATION_MS, loadNotifications, notificationDeletePendingId]);
 
   React.useEffect(() => {
     setAvatarUrl(user?.avatarUrl);
@@ -622,16 +700,46 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
         <div
           ref={popupRef}
           style={{ left: `${popupPos.left}px`, top: `${popupPos.top}px` }}
-          className="fixed z-[9999] w-56 bg-slate-900 rounded-md p-1 text-sm text-slate-200 shadow-glass"
+          className="fixed z-[9999] w-[20rem] max-w-[calc(100vw-1rem)] rounded-2xl border border-cyan-300/20 bg-slate-950/95 p-2 text-sm text-slate-100 shadow-none backdrop-blur-xl"
           role="menu"
           aria-label="Powiadomienia"
         >
+          <div className="mb-1 flex items-center justify-between rounded-xl border border-cyan-300/20 bg-cyan-500/10 px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100">Powiadomienia</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Oznacz wszystkie jako przeczytane"
+                disabled={markAllPending || notificationsUnread === 0}
+                onClick={() => {
+                  void handleMarkAllRead();
+                }}
+                onMouseEnter={(e) => {
+                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                  setTooltip({ text: 'Oznacz wszystkie jako przeczytane', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                }}
+                onMouseLeave={() => setTooltip(null)}
+                onFocus={(e) => {
+                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                  setTooltip({ text: 'Oznacz wszystkie jako przeczytane', x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+                }}
+                onBlur={() => setTooltip(null)}
+                className="app-icon-btn text-cyan-50 hover:text-cyan-100"
+              >
+                <CheckIcon className="h-3.5 w-3.5" aria-hidden />
+              </button>
+              <span className="inline-flex min-w-[1.35rem] items-center justify-center rounded-full bg-cyan-400/30 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-50">
+                {notificationsUnread > 99 ? '99+' : notificationsUnread}
+              </span>
+            </div>
+          </div>
+
           {notificationsLoading ? (
-            <div className="px-3 py-2 text-xs text-white/60">Ładowanie…</div>
+            <div className="rounded-xl border border-cyan-300/20 bg-cyan-500/8 px-3 py-3 text-xs text-cyan-100/85">Ładowanie…</div>
           ) : notifications.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-white/60">Brak powiadomień</div>
+            <div className="rounded-xl border border-cyan-300/20 bg-cyan-500/8 px-3 py-3 text-xs text-cyan-100/85">Brak powiadomień</div>
           ) : (
-            <ul className="divide-y divide-white/6">
+            <ul className="space-y-1">
               {notifications.map((item) => {
                 const targetHref = item.type === 'group_invite'
                   ? '/dashboard/groups'
@@ -641,21 +749,38 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
                 const description = item.message || item.title;
                 const boardInviteActionable = isBoardInviteActionable(item);
                 const actionPending = notificationActionPendingId === item.id;
+                const deleting = notificationDeletePendingId === item.id;
+                const exiting = exitingNotificationIds.includes(item.id);
                 return (
                   <li key={item.id}>
-                    <div className={`w-full text-left px-3 py-2 rounded-md transition ${item.readAt ? 'text-white/80 hover:bg-indigo-500/10' : 'bg-indigo-500/10 text-white hover:bg-indigo-500/20'}`}>
-                      <button
-                        role="menuitem"
-                        tabIndex={0}
-                        onClick={() => {
-                          setNotifOpen(false);
-                          navigateWithoutRefresh(targetHref);
-                        }}
-                        className="w-full text-left"
-                      >
-                        <div className="text-xs font-semibold truncate">{item.title}</div>
-                        <div className="text-[11px] text-white/70 truncate mt-0.5">{description}</div>
-                      </button>
+                    <div className={`w-full rounded-xl border px-3 py-2 transition ${item.readAt ? 'border-cyan-300/15 bg-cyan-500/[0.05] text-cyan-50/90 hover:border-cyan-200/30 hover:bg-cyan-500/[0.09]' : 'border-cyan-300/30 bg-cyan-500/16 text-cyan-50 hover:border-cyan-200/45 hover:bg-cyan-500/20'} ${exiting ? 'animate-zoomOut pointer-events-none' : ''}`}>
+                      <div className="flex items-start gap-2">
+                        <button
+                          role="menuitem"
+                          tabIndex={0}
+                          onClick={() => {
+                            setNotifOpen(false);
+                            navigateWithoutRefresh(targetHref);
+                          }}
+                          className="min-w-0 flex-1 text-left rounded-md focus:outline-none"
+                        >
+                          <div className="text-xs font-semibold leading-tight text-cyan-50 truncate">{item.title}</div>
+                          <div className="mt-0.5 text-[11px] leading-tight text-cyan-100/80 truncate">{description}</div>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Usuń powiadomienie"
+                          disabled={deleting}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleDeleteNotification(item.id);
+                          }}
+                          className="app-icon-btn flex-shrink-0 text-rose-200 hover:text-rose-100"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      </div>
                       {boardInviteActionable && (
                         <div className="mt-2 flex items-center gap-2">
                           <button
@@ -664,7 +789,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
                             onClick={() => {
                               void runBoardInviteAction(item, 'accept');
                             }}
-                            className="app-text-btn-gradient inline-flex items-center justify-center rounded-md px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
+                            className="app-text-btn-accept inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-60"
                           >
                             {actionPending ? '...' : 'Akceptuj'}
                           </button>
@@ -674,7 +799,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
                             onClick={() => {
                               void runBoardInviteAction(item, 'reject');
                             }}
-                            className="inline-flex items-center justify-center rounded-md px-2 py-1 text-[11px] font-semibold text-red-200 hover:text-white hover:bg-red-500/20 disabled:opacity-60"
+                            className="app-text-btn-reject inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-[11px] font-semibold disabled:opacity-60"
                           >
                             Odrzuć
                           </button>
@@ -688,7 +813,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
           )}
           <button
             type="button"
-            className="w-full mt-1 px-3 py-2 text-left text-xs text-indigo-200 hover:text-white hover:bg-indigo-500/10 rounded-md transition"
+            className="mt-2 w-full rounded-xl border border-cyan-300/20 bg-cyan-500/10 px-3 py-2 text-left text-xs font-semibold tracking-wide text-cyan-100 transition hover:border-cyan-200/35 hover:bg-cyan-500/18 hover:text-cyan-50"
             onClick={() => {
               setNotifOpen(false);
               navigateWithoutRefresh('/dashboard/notifications');
@@ -699,6 +824,7 @@ export default function Sidebar({ onNavigate, user, readOnly = false }: SidebarP
         </div>,
         document.body,
       )}
+      {tooltip && <Tooltip text={tooltip.text} x={tooltip.x} y={tooltip.y} />}
     </>
   );
 }

@@ -43,12 +43,27 @@ html {
   }
 }
 
+@keyframes zoomOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+
 .animate-slidein {
   animation: slidein-toast 0.45s cubic-bezier(0.42,0,0.58,1) both;
 }
 
 .animate-fadeOutUp {
   animation: fadeOutUp 0.28s ease-in forwards;
+}
+
+.animate-zoomOut {
+  animation: zoomOut 0.24s ease-in forwards;
 }
 @tailwind base;
 @tailwind components;
@@ -1119,6 +1134,53 @@ body[style*="padding-right"] {
   box-shadow: none !important;
 }
 
+/* Global semantic actions used by notifications and invite flows */
+.app-text-btn-accept {
+  color: #ecfdf5 !important;
+  background-image: none !important;
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(110, 231, 183, 0.40) !important;
+  box-shadow: none !important;
+}
+
+.app-text-btn-accept:hover,
+.app-text-btn-accept:focus,
+.app-text-btn-accept:focus-visible {
+  color: #ffffff !important;
+  background-image: none !important;
+  background-color: rgba(16, 185, 129, 0.28) !important;
+  border-color: rgba(167, 243, 208, 0.55) !important;
+  box-shadow: none !important;
+}
+
+.app-text-btn-reject {
+  color: #ffe4e6 !important;
+  background-image: none !important;
+  background-color: rgba(244, 63, 94, 0.14) !important;
+  border: 1px solid rgba(253, 164, 175, 0.40) !important;
+  box-shadow: none !important;
+}
+
+.app-text-btn-reject:hover,
+.app-text-btn-reject:focus,
+.app-text-btn-reject:focus-visible {
+  color: #ffffff !important;
+  background-image: none !important;
+  background-color: rgba(244, 63, 94, 0.24) !important;
+  border-color: rgba(254, 205, 211, 0.55) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-main button.app-text-btn-accept,
+.dashboard-main button.app-text-btn-reject,
+.right-sidebar-panel button.app-text-btn-accept,
+.right-sidebar-panel button.app-text-btn-reject,
+[role="menu"] button.app-text-btn-accept,
+[role="menu"] button.app-text-btn-reject {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
 button.app-text-btn-gradient:disabled,
 .app-text-btn-gradient[disabled] {
   opacity: 0.55;
@@ -1129,7 +1191,7 @@ button.app-text-btn-gradient:disabled,
 }
 
 /* Global fallback: native text buttons (without explicit icon style) */
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]) {
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]) {
   color: #ffffff;
   background:
     linear-gradient(90deg, var(--dashboard-accent, #6366f1), var(--dashboard-accent-2, #14b8a6)) padding-box,
@@ -1140,18 +1202,18 @@ button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient
   transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
 }
 
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):hover,
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus,
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus-visible {
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):hover,
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus,
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus-visible {
   filter: brightness(1.08);
   box-shadow: none;
 }
 
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):active {
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):active {
   transform: translateY(1px);
 }
 
-button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):disabled {
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.app-text-btn-accept):not(.app-text-btn-reject):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):disabled {
   opacity: 0.55;
   cursor: not-allowed;
   filter: none;
