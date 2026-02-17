@@ -1,5 +1,6 @@
 # Environment secrets
 .env.local
+drizzle.config.json
 /.next
 node_modules/
 dist/
