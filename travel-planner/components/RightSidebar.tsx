@@ -233,7 +233,7 @@ export default function RightSidebar() {
           )}
         </div>
         <div className="flex justify-center gap-2 mt-6">
-          <Button type="button" variant="ghost" onClick={() => setConfirmRemoveId(null)}>
+          <Button type="button" variant="ghost" useTextTheme={false} onClick={() => setConfirmRemoveId(null)}>
             Anuluj
           </Button>
           <Button

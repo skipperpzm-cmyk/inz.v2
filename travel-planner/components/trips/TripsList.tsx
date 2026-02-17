@@ -128,7 +128,7 @@ export default function TripsList({ trips }: Props) {
                     }
                   }}
                   disabled={loadingId === trip.id}
-                  className={`ml-3 inline-flex items-center rounded-lg px-3 py-1 text-xs font-semibold ${loadingId === trip.id ? 'opacity-60' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                  className={`app-text-btn-danger ml-3 inline-flex items-center rounded-lg px-3 py-1 text-xs font-semibold ${loadingId === trip.id ? 'opacity-60' : ''}`}
                 >
                   {loadingId === trip.id ? '...' : 'Usuń'}
                 </button>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/auth';
 import { sqlClient } from '@/src/db/db';
+import { getBoardAccessForUser } from '../../_lib/moderation';
 
 type Params = { params: Promise<{ postId: string }> };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,10 +17,8 @@ export async function DELETE(_request: Request, context: Params) {
 
   try {
     const rows = await sqlClient`
-      select gp.id, gp.group_id, gp.author_id, g.created_by
+      select gp.id, gp.group_id, gp.board_id, gp.author_id
       from public.group_posts gp
-      join public.groups g on g.id = gp.group_id
-      join public.group_members gm on gm.group_id = gp.group_id and gm.user_id = ${userId}
       where gp.id = ${postId}
       limit 1
     `;
@@ -27,7 +26,10 @@ export async function DELETE(_request: Request, context: Params) {
     const row = Array.isArray(rows) && rows.length ? rows[0] : null;
     if (!row) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
-    const canDelete = String(row.author_id) === String(userId) || String(row.created_by) === String(userId);
+    const access = await getBoardAccessForUser(userId, String(row.board_id));
+    if (!access || !access.isMember) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+
+    const canDelete = String(row.author_id) === String(userId) || access.canModerate;
     if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     await sqlClient`delete from public.group_posts where id = ${postId}`;

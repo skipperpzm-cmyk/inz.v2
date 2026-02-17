@@ -1,6 +1,6 @@
-import BoardDetailClient from '@/components/dashboard/BoardDetailClient';
+import GroupBoardsClient from '@/components/dashboard/GroupBoardsClient';
 
-export default async function BoardDetailPage({ params }: { params: Promise<{ groupId: string }> }) {
+export default async function GroupBoardsPage({ params }: { params: Promise<{ groupId: string }> }) {
   const { groupId } = await params;
-  return <BoardDetailClient groupId={groupId} />;
+  return <GroupBoardsClient groupId={groupId} />;
 }

@@ -1,5 +1,5 @@
-import { useBoardContext } from '../contexts/BoardContext';
+import { useBoardDetailContext } from '../contexts/BoardDetailContext';
 
 export function useBoard() {
-  return useBoardContext();
+  return useBoardDetailContext();
 }

@@ -37,7 +37,8 @@ export default function FriendDropdown({ isOpen, onToggle, onClose, onRemove, on
         <EllipsisVerticalIcon className="w-5 h-5" />
       </button>
       <div
-        className={`absolute right-0 mt-[3px] min-w-max whitespace-nowrap rounded-lg border border-white/10 bg-black/60 backdrop-blur-xl shadow-xl p-1 transform transition-all duration-150 ease-out z-[9999] ${
+        role="menu"
+        className={`app-dropdown-menu absolute right-0 mt-[3px] min-w-max whitespace-nowrap rounded-lg border border-white/10 bg-black/60 backdrop-blur-xl shadow-xl p-1 transform transition-all duration-150 ease-out z-[9999] ${
           isOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
         }`}
       >

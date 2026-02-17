@@ -5,7 +5,8 @@ import '../styles/globals.css';
 import ToastProvider from '../components/toast/ToastProvider';
 import { FriendProvider } from '../components/FriendContext';
 import { GroupProvider } from '../contexts/GroupContext';
-import { BoardProvider } from '../contexts/BoardContext';
+import { BoardsProvider, BoardsRealtimeBridge } from '../contexts/BoardsContext';
+import { BoardDetailProvider } from '../contexts/BoardDetailContext';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     return (
@@ -15,17 +16,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </head>
             <body className="min-h-screen bg-slate-900 text-slate-100 antialiased">
                 <ToastProvider>
-                    <BoardProvider>
-                        <GroupProvider>
-                            <FriendProvider>
-                                <div className="min-h-screen flex flex-col">
-                                    <main className="flex-1">
-                                        {children}
-                                    </main>
-                                </div>
-                            </FriendProvider>
-                        </GroupProvider>
-                    </BoardProvider>
+                    <BoardsProvider>
+                        <BoardsRealtimeBridge />
+                        <BoardDetailProvider>
+                            <GroupProvider>
+                                <FriendProvider>
+                                    <div className="min-h-screen flex flex-col">
+                                        <main className="flex-1">
+                                            {children}
+                                        </main>
+                                    </div>
+                                </FriendProvider>
+                            </GroupProvider>
+                        </BoardDetailProvider>
+                    </BoardsProvider>
                 </ToastProvider>
             </body>
         </html>

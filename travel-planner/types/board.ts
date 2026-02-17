@@ -52,6 +52,7 @@ export type BoardTravelInfo = {
 export type BoardComment = {
   id: string;
   postId: string;
+  boardId?: string;
   groupId: string;
   authorId: string;
   authorName: string;
@@ -63,6 +64,7 @@ export type BoardComment = {
 
 export type BoardPost = {
   id: string;
+  boardId?: string;
   groupId: string;
   authorId: string;
   authorName: string;
@@ -75,22 +77,57 @@ export type BoardPost = {
   commentsNextCursor?: string | null;
 };
 
-export type BoardListItem = {
+export type BoardGroupListItem = {
   groupId: string;
   groupName: string;
-  boardName: string;
   groupAvatarUrl?: string | null;
   memberCount: number;
+  boardCount: number;
   lastActivity?: string | null;
-  newPostsCount: number;
+};
+
+export type BoardListItem = {
+  id?: string;
+  groupId: string;
+  groupName?: string;
+  boardName?: string;
+  memberCount?: number;
+  newPostsCount?: number;
+  title?: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+  createdByAvatarUrl?: string | null;
+  postCount?: number;
+  lastActivity?: string | null;
+};
+
+export type BoardModerator = {
+  id: string;
+  username?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+  publicId?: string | null;
+  assignedBy?: string | null;
+  createdAt?: string | null;
 };
 
 export type BoardDetail = {
+  id: string;
   groupId: string;
   groupName: string;
   boardName: string;
+  boardDescription?: string | null;
   groupAvatarUrl?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
   ownerId: string;
   role: 'admin' | 'member';
+  isOwner?: boolean;
+  isModerator?: boolean;
+  canModerate?: boolean;
   travelInfo: BoardTravelInfo;
 };

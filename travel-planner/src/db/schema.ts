@@ -206,6 +206,45 @@ export const groupInvites = pgTable(
   })
 );
 
+export const boardInvites = pgTable(
+  'board_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    boardId: uuid('board_id').notNull(),
+    fromUserId: uuid('from_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    toUserId: uuid('to_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+  },
+  (table) => ({
+    boardIdIdx: index('idx_board_invites_board_id').on(table.boardId),
+    toUserStatusIdx: index('idx_board_invites_to_user_status').on(table.toUserId, table.status),
+  })
+);
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    actorUserId: uuid('actor_user_id'),
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    message: text('message'),
+    entityType: text('entity_type'),
+    entityId: uuid('entity_id'),
+    payload: jsonb('payload').notNull().default(sql`'{}'::jsonb`),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    userCreatedAtIdx: index('idx_notifications_user_created_at').on(table.userId, table.createdAt),
+    userReadAtIdx: index('idx_notifications_user_read_at').on(table.userId, table.readAt),
+    typeIdx: index('idx_notifications_type').on(table.type),
+  })
+);
+
 export const groupBoards = pgTable('group_boards', {
   groupId: uuid('group_id').primaryKey().references(() => groups.id, { onDelete: 'cascade' }),
   boardName: text('board_name'),
@@ -279,6 +318,10 @@ export type GroupMemberRow = typeof groupMembers.$inferSelect;
 export type InsertGroupMemberRow = typeof groupMembers.$inferInsert;
 export type GroupInviteRow = typeof groupInvites.$inferSelect;
 export type InsertGroupInviteRow = typeof groupInvites.$inferInsert;
+export type BoardInviteRow = typeof boardInvites.$inferSelect;
+export type InsertBoardInviteRow = typeof boardInvites.$inferInsert;
+export type NotificationRow = typeof notifications.$inferSelect;
+export type InsertNotificationRow = typeof notifications.$inferInsert;
 export type GroupBoardRow = typeof groupBoards.$inferSelect;
 export type InsertGroupBoardRow = typeof groupBoards.$inferInsert;
 export type GroupPostRow = typeof groupPosts.$inferSelect;

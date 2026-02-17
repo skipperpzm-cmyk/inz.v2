@@ -9,10 +9,12 @@ import {
   CalendarDaysIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  Cog6ToothIcon,
   DocumentTextIcon,
   MapPinIcon,
   PaperAirplaneIcon,
   PencilSquareIcon,
+  PlusIcon,
   TruckIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -31,13 +33,22 @@ import type {
 import { useToast } from '../toast/ToastProvider';
 import { useGroupContext } from '../../contexts/GroupContext';
 import type { GroupMember } from '../../types/group';
+import { getBrowserSupabase } from '../../lib/supabaseClient';
 import Card from '../Card';
+import Modal from '../Modal';
 import Button from '../ui/button';
 
 type Participant = {
   id: string;
   name: string;
   avatarUrl: string | null;
+};
+
+type BoardMember = {
+  id: string;
+  username?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
 };
 
 function formatDate(value?: string | null) {
@@ -504,6 +515,10 @@ const BoardHeader = React.memo(function BoardHeader({
   boardAvatar,
   travelInfo,
   participants,
+  canInviteMembers,
+  onOpenInviteMembers,
+  canManageBoardMembers,
+  onOpenBoardMembersSettings,
   canEdit,
   onAutoSave,
   onRenameBoard,
@@ -514,6 +529,10 @@ const BoardHeader = React.memo(function BoardHeader({
   boardAvatar?: string | null;
   travelInfo: BoardTravelInfo;
   participants: Participant[];
+  canInviteMembers: boolean;
+  onOpenInviteMembers: () => void;
+  canManageBoardMembers: boolean;
+  onOpenBoardMembersSettings: () => void;
   canEdit: boolean;
   onAutoSave: <T extends TravelInfoType>(type: T, payload: TravelInfoPayloadByType[T], opts?: { signal?: AbortSignal }) => Promise<void>;
   onRenameBoard: (nextName: string, opts?: { signal?: AbortSignal }) => Promise<void>;
@@ -1017,7 +1036,7 @@ const BoardHeader = React.memo(function BoardHeader({
 
   return (
     <>
-      <Card className="dashboard-card !min-h-0 !h-auto !max-h-none !overflow-visible !justify-start !gap-0 rounded-2xl p-4 md:p-5 bg-slate-950/85 border-slate-600/60">
+      <Card className="dashboard-card !min-h-0 !h-auto !max-h-none !overflow-visible !justify-start !gap-0 rounded-2xl p-4 md:p-5 bg-slate-950/85 border-slate-600/60 lg:pl-6 lg:pr-6">
         <div className="grid grid-cols-1 md:grid-cols-[minmax(0,0.5fr)_minmax(0,0.5fr)] gap-6">
           <div className="min-w-0">
             <div className="flex items-start gap-4 min-w-0">
@@ -1053,14 +1072,16 @@ const BoardHeader = React.memo(function BoardHeader({
                 ) : (
                   <div className="group max-w-[460px] inline-flex items-center gap-2">
                     <h1 className="truncate text-2xl font-semibold text-white">{boardName}</h1>
-                    <button
-                      type="button"
-                      onClick={startInlineTitleEdit}
-                      aria-label="Edytuj nazwę tablicy"
-                      className={inlineEditButtonClass}
-                    >
-                      <PencilSquareIcon className="h-4 w-4" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={startInlineTitleEdit}
+                        aria-label="Edytuj nazwę tablicy"
+                        className={inlineEditButtonClass}
+                      >
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 )}
                 </div>
@@ -1199,14 +1220,16 @@ const BoardHeader = React.memo(function BoardHeader({
                       <CalendarDaysIcon className="w-4 h-4 text-white/90" />
                       <span className="text-white/85">Daty:</span>
                       <span className="truncate">{formatDate(travelInfo.startDate)} — {formatDate(travelInfo.endDate)}</span>
-                      <button
-                        type="button"
-                        onClick={() => startInlineMainEdit('dates')}
-                        aria-label="Edytuj daty"
-                        className={`ml-1 ${inlineEditButtonClass}`}
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => startInlineMainEdit('dates')}
+                          aria-label="Edytuj daty"
+                          className={`ml-1 ${inlineEditButtonClass}`}
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1422,14 +1445,16 @@ const BoardHeader = React.memo(function BoardHeader({
                       <MapPinIcon className="w-4 h-4 text-white/90" />
                       <span className="text-white/85">Lokalizacja:</span>
                       <span className="truncate">{travelInfo.location || 'Brak lokalizacji'}</span>
-                      <button
-                        type="button"
-                        onClick={() => startInlineMainEdit('location')}
-                        aria-label="Edytuj lokalizację"
-                        className={`ml-1 ${inlineEditButtonClass}`}
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => startInlineMainEdit('location')}
+                          aria-label="Edytuj lokalizację"
+                          className={`ml-1 ${inlineEditButtonClass}`}
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1438,19 +1463,46 @@ const BoardHeader = React.memo(function BoardHeader({
 
                 <div className="mt-3 flex items-center gap-2">
                   {participants.length === 0 ? (
-                    <p className="text-xs text-white/55">Brak członków grupy.</p>
+                    <p className="text-xs text-white/55">Brak członków tablicy.</p>
                   ) : (
-                    participants.slice(0, 10).map((member) => (
-                      <div key={member.id} className="group relative">
-                        {member.avatarUrl ? (
-                          <img src={member.avatarUrl} alt={member.name} className="w-8 h-8 rounded-full border border-white/15 object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-white/10 border border-white/15 text-[10px] text-white flex items-center justify-center font-semibold">
-                            {getInitials(member.name)}
-                          </div>
-                        )}
-                      </div>
-                    ))
+                    <div className="flex items-center -space-x-4">
+                      {participants.slice(0, 10).map((member) => (
+                        <div key={member.id} className="group relative">
+                          {member.avatarUrl ? (
+                            <img src={member.avatarUrl} alt={member.name} className="w-8 h-8 rounded-full border border-slate-800 object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-white/10 border border-slate-800 text-[10px] text-white flex items-center justify-center font-semibold">
+                              {getInitials(member.name)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {participants.length > 10 && (
+                        <div className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-slate-800 bg-slate-700 px-2 text-[11px] font-semibold text-white">
+                          +{participants.length - 10}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {canInviteMembers && (
+                    <button
+                      type="button"
+                      onClick={onOpenInviteMembers}
+                      aria-label="Zaproś członka grupy do tablicy"
+                      className="app-icon-btn"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  {canManageBoardMembers && (
+                    <button
+                      type="button"
+                      onClick={onOpenBoardMembersSettings}
+                      aria-label="Ustawienia członków tablicy"
+                      className="app-icon-btn"
+                    >
+                      <Cog6ToothIcon className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
 
@@ -1537,7 +1589,7 @@ const AddPostCard = React.memo(function AddPostCard({
 
 const PostCard = React.memo(function PostCard({
   post,
-  boardOwnerId,
+  canModerate,
   currentUserId,
   commentsOpen,
   commentDraft,
@@ -1550,7 +1602,7 @@ const PostCard = React.memo(function PostCard({
   onLoadMoreComments,
 }: {
   post: BoardPost;
-  boardOwnerId: string;
+  canModerate: boolean;
   currentUserId: string | null;
   commentsOpen: boolean;
   commentDraft: string;
@@ -1562,7 +1614,7 @@ const PostCard = React.memo(function PostCard({
   onDeletePost: () => void;
   onLoadMoreComments: () => void;
 }) {
-  const canDeletePost = post.authorId === currentUserId || boardOwnerId === currentUserId;
+  const canDeletePost = post.authorId === currentUserId || canModerate;
 
   return (
     <Card className="dashboard-card min-h-0 h-auto justify-start rounded-2xl p-4 md:p-5 bg-white/[0.035] border-white/10">
@@ -1584,7 +1636,7 @@ const PostCard = React.memo(function PostCard({
         {canDeletePost && (
           <button
             type="button"
-            className="text-xs px-2 py-1 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30"
+            className="app-text-btn-danger text-xs px-2 py-1 rounded-lg"
             onClick={onDeletePost}
           >
             Usuń
@@ -1611,7 +1663,7 @@ const PostCard = React.memo(function PostCard({
             )}
 
             {post.comments.map((comment: BoardComment) => {
-              const canDeleteComment = comment.authorId === currentUserId || boardOwnerId === currentUserId;
+              const canDeleteComment = comment.authorId === currentUserId || canModerate;
               return (
                 <div key={comment.id} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
                   <div className="flex items-center justify-between gap-2">
@@ -1621,7 +1673,7 @@ const PostCard = React.memo(function PostCard({
                     {canDeleteComment && (
                       <button
                         type="button"
-                        className="text-[11px] px-2 py-0.5 rounded bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                        className="app-text-btn-danger text-[11px] px-2 py-0.5 rounded"
                         onClick={() => onDeleteComment(comment.id)}
                       >
                         Usuń
@@ -1708,7 +1760,7 @@ const TravelInfoSidebar = React.memo(function TravelInfoSidebar({
   );
 });
 
-export default function BoardDetailClient({ groupId }: { groupId: string }) {
+export default function BoardDetailClient({ groupId, boardId }: { groupId: string; boardId: string }) {
   const router = useRouter();
   const toast = useToast();
   const {
@@ -1719,6 +1771,8 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
   const {
     currentUserId,
     activeBoard,
+    moderators,
+    canModerate,
     activeBoardStatus,
     posts,
     postsNextCursor,
@@ -1733,6 +1787,8 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
     deletePost,
     createComment,
     deleteComment,
+    addModerator,
+    removeModerator,
     loadMoreComments,
     updateBoardName,
     updateTravelInfo,
@@ -1745,6 +1801,12 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
   const [commentsOpen, setCommentsOpen] = useState<Record<string, boolean>>({});
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [boardMembers, setBoardMembers] = useState<BoardMember[]>([]);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [selectedInviteUserId, setSelectedInviteUserId] = useState('');
+  const [invitePending, setInvitePending] = useState(false);
+  const [memberSettingsModalOpen, setMemberSettingsModalOpen] = useState(false);
+  const [memberMutationPendingId, setMemberMutationPendingId] = useState<string | null>(null);
 
   const mutationControllersRef = useRef<Set<AbortController>>(new Set());
 
@@ -1761,12 +1823,12 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     clearBoardState();
-    void loadBoard(groupId, { signal: controller.signal });
-    void loadPosts(groupId, { signal: controller.signal, cursor: null, append: false });
+    void loadBoard(groupId, boardId, { signal: controller.signal });
+    void loadPosts(groupId, boardId, { signal: controller.signal, cursor: null, append: false });
     return () => {
       controller.abort();
     };
-  }, [clearBoardState, groupId, loadBoard, loadPosts]);
+  }, [boardId, clearBoardState, groupId, loadBoard, loadPosts]);
 
   useEffect(() => {
     return () => {
@@ -1784,30 +1846,224 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
   useEffect(() => {
     if (activeBoardStatus !== 403 && activeBoardStatus !== 404) return;
     toast.push({ type: 'error', title: 'Tablica', message: 'Brak dostępu do tablicy. Przeniesiono do listy tablic.' });
-    router.replace('/dashboard/boards');
-  }, [activeBoardStatus, router, toast]);
+    router.replace(`/dashboard/boards/${encodeURIComponent(groupId)}`);
+  }, [activeBoardStatus, groupId, router, toast]);
 
   useEffect(() => {
     if (!activeBoard?.groupId) return;
     void fetchMembers(activeBoard.groupId);
   }, [activeBoard?.groupId, fetchMembers]);
 
-  const canEditInfo = useMemo(() => {
-    if (!activeBoard) return false;
-    return activeBoard.ownerId === currentUserId;
-  }, [activeBoard, currentUserId]);
+  const loadBoardMembers = useCallback(async (boardIdToLoad: string, opts?: { signal?: AbortSignal }) => {
+    if (!boardIdToLoad) return;
+    const response = await fetch(`/api/boards/by-id/${encodeURIComponent(boardIdToLoad)}/members`, {
+      credentials: 'include',
+      cache: 'no-store',
+      signal: opts?.signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.error || 'Nie udało się pobrać członków tablicy.');
+    }
+    const payload = await response.json();
+    const next = Array.isArray(payload?.members) ? (payload.members as BoardMember[]) : [];
+    setBoardMembers(next);
+  }, []);
+
+  useEffect(() => {
+    if (!activeBoard?.id) {
+      setBoardMembers([]);
+      setInviteModalOpen(false);
+      setMemberSettingsModalOpen(false);
+      setSelectedInviteUserId('');
+      return;
+    }
+
+    const controller = new AbortController();
+    void loadBoardMembers(activeBoard.id, { signal: controller.signal }).catch((err) => {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      toast.push({
+        type: 'error',
+        title: 'Członkowie tablicy',
+        message: err instanceof Error ? err.message : 'Nie udało się pobrać członków tablicy.',
+      });
+    });
+
+    return () => controller.abort();
+  }, [activeBoard?.id, loadBoardMembers, toast]);
+
+  useEffect(() => {
+    if (!activeBoard?.id) return;
+
+    const boardId = activeBoard.id;
+    const supabase = getBrowserSupabase();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => {
+        if (cancelled) return;
+        void loadBoardMembers(boardId).catch(() => {
+          // ignore transient realtime reload errors
+        });
+      }, 120);
+    };
+
+    (async () => {
+      try {
+        const tokenRes = await fetch('/api/supabase/realtime-token', { credentials: 'include', cache: 'no-store' });
+        if (!tokenRes.ok || cancelled) return;
+        const tokenJson = await tokenRes.json().catch(() => ({}));
+        if (typeof tokenJson?.token !== 'string' || cancelled) return;
+        supabase.realtime.setAuth(tokenJson.token);
+
+        channel = supabase
+          .channel(`board-members:${boardId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'board_members', filter: `board_id=eq.${boardId}` },
+            scheduleReload
+          )
+          .subscribe();
+      } catch {
+        // ignore realtime bootstrap failures
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (reloadTimer) clearTimeout(reloadTimer);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [activeBoard?.id, loadBoardMembers]);
+
+  const canEditInfo = canModerate;
 
   const postsByDay = useMemo(() => groupPostsByDay(posts), [posts]);
 
   const participants = useMemo<Participant[]>(() => {
-    if (!activeBoard) return [];
-    const members: GroupMember[] = membersByGroupId[activeBoard.groupId] ?? [];
-    return members.map((member) => ({
+    return boardMembers.map((member) => ({
       id: member.id,
       name: member.fullName || member.username || 'Użytkownik',
       avatarUrl: member.avatarUrl ?? null,
     }));
-  }, [activeBoard, membersByGroupId]);
+  }, [boardMembers]);
+
+  const availableBoardInviteCandidates = useMemo(() => {
+    if (!activeBoard) return [] as GroupMember[];
+    const members: GroupMember[] = membersByGroupId[activeBoard.groupId] ?? [];
+    const boardMemberIds = new Set(boardMembers.map((entry) => entry.id));
+    return members.filter((member) => !boardMemberIds.has(member.id));
+  }, [activeBoard, boardMembers, membersByGroupId]);
+
+  useEffect(() => {
+    if (!selectedInviteUserId) return;
+    const stillAvailable = availableBoardInviteCandidates.some((member) => String(member.id) === selectedInviteUserId);
+    if (!stillAvailable) setSelectedInviteUserId('');
+  }, [availableBoardInviteCandidates, selectedInviteUserId]);
+
+  const handleToggleModerator = useCallback(async (userId: string, currentlyModerator: boolean) => {
+    if (!activeBoard || !userId || memberMutationPendingId) return;
+    if (currentUserId && userId === currentUserId) {
+      toast.push({ type: 'error', title: 'Moderatorzy', message: 'Nie możesz zmienić swoich własnych uprawnień moderatora.' });
+      return;
+    }
+    setMemberMutationPendingId(userId);
+    const controller = registerController();
+    try {
+      if (currentlyModerator) {
+        await removeModerator(activeBoard.id, userId, { signal: controller.signal });
+        toast.push({ type: 'success', title: 'Moderatorzy', message: 'Usunięto moderatora tablicy.' });
+      } else {
+        await addModerator(activeBoard.id, userId, { signal: controller.signal });
+        toast.push({ type: 'success', title: 'Moderatorzy', message: 'Dodano moderatora tablicy.' });
+      }
+    } catch (err) {
+      toast.push({
+        type: 'error',
+        title: 'Moderatorzy',
+        message: err instanceof Error ? err.message : 'Nie udało się zaktualizować moderatora.',
+      });
+    } finally {
+      releaseController(controller);
+      setMemberMutationPendingId(null);
+    }
+  }, [activeBoard, addModerator, currentUserId, memberMutationPendingId, removeModerator, toast]);
+
+  const handleRemoveBoardMember = useCallback(async (userId: string) => {
+    if (!activeBoard || !userId || memberMutationPendingId) return;
+    if (currentUserId && userId === currentUserId) {
+      toast.push({ type: 'error', title: 'Tablica', message: 'Nie możesz usunąć siebie z tablicy.' });
+      return;
+    }
+    if (userId === activeBoard.ownerId) {
+      toast.push({ type: 'error', title: 'Tablica', message: 'Nie można usunąć właściciela tablicy.' });
+      return;
+    }
+
+    setMemberMutationPendingId(userId);
+    const controller = registerController();
+    try {
+      const response = await fetch(`/api/boards/by-id/${encodeURIComponent(activeBoard.id)}/members/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.error) {
+        throw new Error(payload?.error || 'Nie udało się usunąć członka tablicy.');
+      }
+
+      const nextMembers = Array.isArray(payload?.members) ? (payload.members as BoardMember[]) : [];
+      setBoardMembers(nextMembers);
+      toast.push({ type: 'success', title: 'Tablica', message: 'Usunięto członka z tablicy.' });
+    } catch (err) {
+      toast.push({
+        type: 'error',
+        title: 'Tablica',
+        message: err instanceof Error ? err.message : 'Nie udało się usunąć członka z tablicy.',
+      });
+    } finally {
+      releaseController(controller);
+      setMemberMutationPendingId(null);
+    }
+  }, [activeBoard, currentUserId, memberMutationPendingId, toast]);
+
+  const handleInviteMemberToBoard = useCallback(async () => {
+    if (!activeBoard || !selectedInviteUserId || invitePending) return;
+    setInvitePending(true);
+    const controller = registerController();
+    try {
+      const response = await fetch(`/api/boards/by-id/${encodeURIComponent(activeBoard.id)}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: controller.signal,
+        body: JSON.stringify({ userId: selectedInviteUserId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.error) {
+        throw new Error(payload?.error || 'Nie udało się wysłać zaproszenia do tablicy.');
+      }
+
+      const nextMembers = Array.isArray(payload?.members) ? (payload.members as BoardMember[]) : [];
+      setBoardMembers(nextMembers);
+      setSelectedInviteUserId('');
+      setInviteModalOpen(false);
+      toast.push({ type: 'success', title: 'Tablica', message: 'Wysłano zaproszenie do tablicy.' });
+    } catch (err) {
+      toast.push({
+        type: 'error',
+        title: 'Tablica',
+        message: err instanceof Error ? err.message : 'Nie udało się wysłać zaproszenia do tablicy.',
+      });
+    } finally {
+      releaseController(controller);
+      setInvitePending(false);
+    }
+  }, [activeBoard, invitePending, selectedInviteUserId, toast]);
 
   const handleAutoSaveTravelInfo = useCallback(
     async <T extends TravelInfoType>(
@@ -1822,6 +2078,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
 
       await updateTravelInfo(
         activeBoard.groupId,
+        activeBoard.id,
         {
           location: currentInfo.location ?? null,
           startDate: currentInfo.startDate ?? null,
@@ -1840,7 +2097,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
   const handleRenameBoard = useCallback(
     async (nextName: string, opts?: { signal?: AbortSignal }) => {
       if (!activeBoard) return;
-      await updateBoardName(activeBoard.groupId, nextName, opts);
+      await updateBoardName(activeBoard.groupId, activeBoard.id, nextName, opts);
     },
     [activeBoard, updateBoardName]
   );
@@ -1855,6 +2112,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
 
       await updateTravelInfo(
         activeBoard.groupId,
+        activeBoard.id,
         {
           location: payload.location ?? currentInfo.location ?? null,
           startDate: payload.startDate ?? currentInfo.startDate ?? null,
@@ -1875,7 +2133,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
     setPosting(true);
     const controller = registerController();
     try {
-      await createPost(activeBoard.groupId, postContent, { signal: controller.signal });
+      await createPost(activeBoard.groupId, activeBoard.id, postContent, { signal: controller.signal });
       setPostContent('');
     } finally {
       releaseController(controller);
@@ -1902,8 +2160,8 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
             type="button"
             variant="secondary"
             onClick={() => {
-              void loadBoard(groupId);
-              void loadPosts(groupId, { cursor: null, append: false });
+              void loadBoard(groupId, boardId);
+              void loadPosts(groupId, boardId, { cursor: null, append: false });
             }}
           >
             Spróbuj ponownie
@@ -1921,11 +2179,165 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
         boardAvatar={activeBoard.groupAvatarUrl}
         travelInfo={activeBoard.travelInfo}
         participants={participants}
+        canInviteMembers={canModerate}
+        onOpenInviteMembers={() => setInviteModalOpen(true)}
+        canManageBoardMembers={canModerate}
+        onOpenBoardMembersSettings={() => setMemberSettingsModalOpen(true)}
         canEdit={canEditInfo}
         onAutoSave={handleAutoSaveTravelInfo}
         onRenameBoard={handleRenameBoard}
         onUpdateMainInfo={handleUpdateMainInfo}
       />
+
+      <Modal open={inviteModalOpen && canModerate} onClose={() => setInviteModalOpen(false)} title={undefined} showCloseButton={true} panelClassName="max-w-[30rem]">
+        <div className="p-6 w-full overflow-hidden" style={{ overflow: 'hidden', height: '600px', minHeight: '600px', maxHeight: '600px' }}>
+          <div className="mb-4 pb-4 border-b border-white/10">
+            <div className="text-xl font-semibold text-white text-center">Zaproś do tablicy</div>
+            <div className="text-xs text-white/60 text-center mt-2">Wybierz członka grupy, który ma dostać dostęp do tej tablicy.</div>
+          </div>
+          {availableBoardInviteCandidates.length > 0 && (
+            <div className="h-[400px] overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-1">
+              {availableBoardInviteCandidates.map((member) => {
+                const memberIdRaw = (member as { id?: string; userId?: string; user_id?: string }).id
+                  ?? (member as { id?: string; userId?: string; user_id?: string }).userId
+                  ?? (member as { id?: string; userId?: string; user_id?: string }).user_id
+                  ?? '';
+                const memberId = String(memberIdRaw);
+                const label = member.fullName || member.username || 'Użytkownik';
+                const isSelected = selectedInviteUserId === memberId;
+                return (
+                  <button
+                    key={memberId}
+                    type="button"
+                    onClick={() => {
+                      if (!memberId) return;
+                      setSelectedInviteUserId((prev) => (prev === memberId ? '' : memberId));
+                    }}
+                    aria-pressed={isSelected}
+                    data-selected={isSelected ? 'true' : 'false'}
+                    className={`invite-select-btn w-full rounded-md px-3 py-2 text-left text-sm transition ${
+                      isSelected
+                        ? '!border-white/30 !bg-white/20 !text-white'
+                        : '!border-transparent !bg-transparent !text-white/85 hover:!border-white/10 hover:!bg-white/10 hover:!text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {availableBoardInviteCandidates.length === 0 && (
+            <p className="mt-2 text-xs text-white/60">Wszyscy członkowie grupy mają już dostęp do tej tablicy.</p>
+          )}
+
+          <div className="flex justify-center gap-2 mt-6">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setInviteModalOpen(false)}
+              className="app-text-btn-gradient min-w-[9rem]"
+            >
+              Anuluj
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                void handleInviteMemberToBoard();
+              }}
+              disabled={invitePending || !selectedInviteUserId}
+              className="app-text-btn-gradient min-w-[9rem]"
+            >
+              {invitePending ? 'Dodawanie...' : 'Dodaj do tablicy'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={memberSettingsModalOpen && canModerate} onClose={() => setMemberSettingsModalOpen(false)} title={undefined} showCloseButton={true}>
+        <div className="p-6 max-w-2xl mx-auto overflow-hidden" style={{ overflow: 'hidden', maxHeight: '90vh' }}>
+          <div className="mb-4 pb-4 border-b border-white/10">
+            <div className="text-xl font-semibold text-white text-center">Ustawienia tablicy</div>
+            <div className="text-xs text-white/60 text-center mt-2">Zarządzaj członkami tablicy i uprawnieniami moderatora.</div>
+          </div>
+
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+            {boardMembers.length === 0 ? (
+              <p className="text-sm text-white/60">Brak członków tablicy.</p>
+            ) : (
+              boardMembers.map((member) => {
+                const displayName = member.fullName || member.username || 'Użytkownik';
+                const isMemberModerator = moderators.some((entry) => entry.id === member.id);
+                const isOwnerMember = activeBoard.ownerId === member.id;
+                const isCurrentUserMember = currentUserId === member.id;
+                const pending = memberMutationPendingId === member.id;
+
+                return (
+                  <div key={member.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt={displayName} className="h-8 w-8 rounded-full object-cover border border-white/15" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-white/10 border border-white/15 text-[10px] text-white flex items-center justify-center font-semibold">
+                          {getInitials(displayName)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="truncate text-sm text-white/90">{displayName}</div>
+                        <div className="text-[11px] text-white/55">
+                          {isOwnerMember ? 'Właściciel' : isMemberModerator ? 'Moderator' : 'Członek'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!isOwnerMember && !isCurrentUserMember && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="px-2.5 py-1.5 text-xs"
+                          disabled={pending}
+                          onClick={() => {
+                            void handleToggleModerator(member.id, isMemberModerator);
+                          }}
+                        >
+                          {isMemberModerator ? 'Usuń moderatora' : 'Nadaj moderatora'}
+                        </Button>
+                      )}
+                      {!isOwnerMember && !isCurrentUserMember && (
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="px-2.5 py-1.5 text-xs"
+                          disabled={pending}
+                          onClick={() => {
+                            void handleRemoveBoardMember(member.id);
+                          }}
+                        >
+                          Usuń z tablicy
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex justify-center gap-2 mt-6">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setMemberSettingsModalOpen(false)}
+              className="app-text-btn-gradient min-w-[9rem]"
+            >
+              Zamknij
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="lg:hidden">
         <button
@@ -1958,8 +2370,8 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
                   variant="secondary"
                   className="px-2 py-1 text-xs"
                   onClick={() => {
-                    void loadBoard(groupId);
-                    void loadPosts(groupId, { cursor: null, append: false });
+                    void loadBoard(groupId, boardId);
+                    void loadPosts(groupId, boardId, { cursor: null, append: false });
                   }}
                 >
                   Retry
@@ -1983,7 +2395,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
                         <PostCard
                           key={post.id}
                           post={post}
-                          boardOwnerId={activeBoard.ownerId}
+                          canModerate={canModerate}
                           currentUserId={currentUserId}
                           commentsOpen={Boolean(commentsOpen[post.id])}
                           commentDraft={commentDrafts[post.id] ?? ''}
@@ -2025,7 +2437,7 @@ export default function BoardDetailClient({ groupId }: { groupId: string }) {
                       type="button"
                       variant="secondary"
                       disabled={loadingMorePosts || !postsNextCursor}
-                      onClick={() => void loadMorePosts(groupId)}
+                      onClick={() => void loadMorePosts(groupId, boardId)}
                     >
                       {loadingMorePosts ? 'Ładowanie…' : 'Pokaż więcej postów'}
                     </Button>

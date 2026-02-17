@@ -46,9 +46,9 @@ export async function GET(request: Request, context: Params) {
 
   try {
     const postRows = await sqlClient`
-      select gp.id
+      select gp.id, gp.board_id
       from public.group_posts gp
-      join public.group_members gm on gm.group_id = gp.group_id and gm.user_id = ${userId}
+      join public.board_members bm on bm.board_id = gp.board_id and bm.user_id = ${userId}
       where gp.id = ${postId}
       limit 1
     `;
@@ -60,6 +60,7 @@ export async function GET(request: Request, context: Params) {
       select
         gc.id,
         gc.post_id,
+            gc.board_id,
         gc.group_id,
         gc.author_id,
         gc.content,
@@ -88,6 +89,7 @@ export async function GET(request: Request, context: Params) {
       .map((row: any) => ({
         id: String(row.id),
         postId: String(row.post_id),
+        boardId: String(row.board_id),
         groupId: String(row.group_id),
         authorId: String(row.author_id),
         authorName: String(row.author_name ?? 'Użytkownik'),
@@ -133,9 +135,9 @@ export async function POST(request: Request, context: Params) {
 
   try {
     const postRows = await sqlClient`
-      select gp.id, gp.group_id
+      select gp.id, gp.group_id, gp.board_id
       from public.group_posts gp
-      join public.group_members gm on gm.group_id = gp.group_id and gm.user_id = ${userId}
+      join public.board_members bm on bm.board_id = gp.board_id and bm.user_id = ${userId}
       where gp.id = ${postId}
       limit 1
     `;
@@ -144,9 +146,9 @@ export async function POST(request: Request, context: Params) {
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
     const inserted = await sqlClient`
-      insert into public.group_comments (post_id, group_id, author_id, content)
-      values (${post.id}, ${post.group_id}, ${userId}, ${content})
-      returning id, post_id, group_id, author_id, content, created_at
+      insert into public.group_comments (post_id, board_id, group_id, author_id, content)
+      values (${post.id}, ${post.board_id}, ${post.group_id}, ${userId}, ${content})
+      returning id, post_id, board_id, group_id, author_id, content, created_at
     `;
 
     const row = Array.isArray(inserted) && inserted.length ? inserted[0] : null;
@@ -167,6 +169,7 @@ export async function POST(request: Request, context: Params) {
       comment: {
         id: String(row.id),
         postId: String(row.post_id),
+        boardId: String(row.board_id),
         groupId: String(row.group_id),
         authorId: String(row.author_id),
         authorName: String(profile?.author_name ?? 'Użytkownik'),

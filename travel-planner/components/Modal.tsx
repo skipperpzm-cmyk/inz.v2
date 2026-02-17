@@ -9,9 +9,10 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   showCloseButton?: boolean;
+  panelClassName?: string;
 }
 
-export default function Modal({ open, onClose, title, children, showCloseButton }: ModalProps) {
+export default function Modal({ open, onClose, title, children, showCloseButton, panelClassName }: ModalProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -29,7 +30,7 @@ export default function Modal({ open, onClose, title, children, showCloseButton 
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="relative z-10 w-full max-w-2xl rounded-3xl border border-white/10 bg-white/5 p-6 shadow-glass backdrop-blur-2xl"
+              className={`relative z-10 w-full max-w-2xl rounded-3xl border border-white/10 bg-white/5 p-6 shadow-glass backdrop-blur-2xl ${panelClassName ?? ''}`}
             >
               {title && (
                 <Dialog.Title className="text-xl font-semibold text-white mb-4">

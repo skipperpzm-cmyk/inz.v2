@@ -1,5 +1,6 @@
 import { requireDb } from 'src/db/db';
 import { sql } from 'drizzle-orm';
+import { createNotification } from 'src/db/repositories/notifications.repository';
 
 export type InviteRow = {
   id: string;
@@ -130,7 +131,26 @@ export async function createInvite(fromUserId: string, toUserId: string) {
       sql`INSERT INTO public.friend_invites (from_user_id, to_user_id) VALUES (${fromUserId}, ${toUserId}) RETURNING id, from_user_id, to_user_id, status, created_at`
     );
     const rows = (res as any).rows ?? res;
-    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const created = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+
+    if (created?.id) {
+      try {
+        await createNotification({
+          userId: toUserId,
+          actorUserId: fromUserId,
+          type: 'friend_invite',
+          title: 'Nowe zaproszenie do znajomych',
+          message: 'Ktoś zaprosił Cię do znajomych.',
+          entityType: 'friend_invite',
+          entityId: String(created.id),
+          payload: { inviteId: String(created.id), fromUserId, toUserId },
+        });
+      } catch (notificationErr) {
+        console.error('Failed to create friend invite notification', notificationErr);
+      }
+    }
+
+    return created;
   } catch (err: any) {
     // unique constraint (duplicate pending) will surface as error — normalize message
     if (err?.message && err.message.includes('uq_friend_invites_from_to_pending')) {

@@ -173,7 +173,7 @@ export function SectionTabButton({
   return (
     <button
       onClick={onClick}
-      className={`relative px-4 py-2 text-sm rounded-full transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 ${active ? 'bg-indigo-500/80 text-white' : 'text-white/70 hover:bg-white/10'}`}
+      className={`right-sidebar-section-tab relative px-4 py-2 text-sm rounded-full transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 ${active ? 'bg-indigo-500/80 text-white' : 'text-white/70 hover:bg-white/10'}`}
       style={{ minWidth: 100 }}
     >
       {icon}

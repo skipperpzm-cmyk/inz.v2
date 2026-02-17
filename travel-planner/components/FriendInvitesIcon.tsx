@@ -12,7 +12,7 @@ export default function FriendInvitesIcon({ count = 0, onClick, ariaLabel = 'Zap
   return (
     <span
       aria-label={ariaLabel}
-      className="relative inline-flex items-center justify-center w-9 h-9"
+      className="app-icon-btn-shell"
     >
       <InboxIcon className="w-5 h-5" aria-hidden />
       {count > 0 && (

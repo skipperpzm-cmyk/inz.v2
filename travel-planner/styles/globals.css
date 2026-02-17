@@ -32,8 +32,23 @@ html {
   }
 }
 
+@keyframes fadeOutUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
 .animate-slidein {
   animation: slidein-toast 0.45s cubic-bezier(0.42,0,0.58,1) both;
+}
+
+.animate-fadeOutUp {
+  animation: fadeOutUp 0.28s ease-in forwards;
 }
 @tailwind base;
 @tailwind components;
@@ -349,6 +364,14 @@ textarea {
 body {
   /* Use automatic vertical scrolling: no forced scrollbar when content fits viewport */
   overflow-y: auto;
+}
+
+/* Modal anti-shift guard:
+   Headless UI Dialog may inject inline padding-right on html/body when locking scroll,
+   which causes visible horizontal movement of dashboard content. Keep padding fixed. */
+html[style*="padding-right"],
+body[style*="padding-right"] {
+  padding-right: 0 !important;
 }
 
 /* Helper class used by specific pages to disable vertical scrolling
@@ -791,7 +814,20 @@ body {
   backdrop-filter: blur(12px) !important;
 }
 
+.app-dropdown-menu {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
 .board-country-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.90) !important;
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  cursor: pointer;
+}
+
+.app-dropdown-trigger {
   border: 1px solid rgba(255, 255, 255, 0.10) !important;
   color: rgba(255, 255, 255, 0.90) !important;
   background-color: rgba(0, 0, 0, 0.60) !important;
@@ -809,7 +845,24 @@ body {
   box-shadow: none !important;
 }
 
+.app-dropdown-trigger:hover,
+.app-dropdown-trigger:focus,
+.app-dropdown-trigger:focus-visible,
+.app-dropdown-trigger:active {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  background-color: rgba(0, 0, 0, 0.70) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .board-country-option {
+  color: #e2e8f0 !important;
+  background-color: transparent !important;
+  cursor: pointer;
+}
+
+.app-dropdown-option {
   color: #e2e8f0 !important;
   background-color: transparent !important;
   cursor: pointer;
@@ -819,6 +872,16 @@ body {
 .board-country-option:focus,
 .board-country-option:focus-visible,
 .board-country-option:active {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.app-dropdown-option:hover,
+.app-dropdown-option:focus,
+.app-dropdown-option:focus-visible,
+.app-dropdown-option:active {
   color: #ffffff !important;
   background-color: rgba(255, 255, 255, 0.10) !important;
   outline: none !important;
@@ -841,6 +904,43 @@ body {
   color: rgba(255, 255, 255, 0.95) !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+/* Group boards actions use the same global icon-button theme. */
+.dashboard-main button.board-actions-trigger,
+.dashboard-main button.app-icon-btn {
+  background-color: rgba(255,255,255,0.06) !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  transform: none !important;
+}
+
+.dashboard-main button.board-actions-trigger:hover,
+.dashboard-main button.board-actions-trigger:focus,
+.dashboard-main button.board-actions-trigger:focus-visible,
+.dashboard-main button.board-actions-trigger:active,
+.dashboard-main button.app-icon-btn:hover,
+.dashboard-main button.app-icon-btn:focus,
+.dashboard-main button.app-icon-btn:focus-visible,
+.dashboard-main button.app-icon-btn:active {
+  background-color: rgba(255,255,255,0.10) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+}
+
+.dashboard-main button.board-actions-trigger::before,
+.dashboard-main button.board-actions-trigger::after,
+.dashboard-main button.app-icon-btn::before,
+.dashboard-main button.app-icon-btn::after {
+  content: none !important;
+  display: none !important;
 }
 
 .board-country-search::placeholder {
@@ -873,6 +973,274 @@ body {
 /* Ensure hover on selected state keeps subtle inset but still darkens */
 .dashboard-main .trip-type-btn[aria-pressed="true"]:hover {
   filter: brightness(0.93);
+}
+
+/* Global button theme: icon buttons */
+.app-icon-btn,
+.app-icon-btn-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+/* Shell is only a neutral wrapper (reference style, not interactive). */
+.app-icon-btn-shell {
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* Global icon-button style derived from shell visual language. */
+.app-icon-btn {
+  border-radius: 0.375rem;
+  color: #ffffff;
+  background-color: rgba(255,255,255,0.06);
+  border: none;
+  box-shadow: none;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.app-icon-btn:hover,
+.app-icon-btn:focus,
+.app-icon-btn:focus-visible,
+.app-icon-btn:active {
+  background-color: rgba(255,255,255,0.10);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+/* Global button theme: text buttons with gradient */
+/* Glassmorphism neutral text button theme */
+.app-text-btn-gradient {
+  color: #ffffff !important;
+  background:
+    linear-gradient(90deg, var(--dashboard-accent, #6366f1), var(--dashboard-accent-2, #14b8a6)) padding-box,
+    linear-gradient(90deg, rgba(129, 140, 248, 0.88), rgba(45, 212, 191, 0.88)) border-box !important;
+  border: 1.5px solid transparent !important;
+  outline: none !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+  transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+/* Force global text-button theme inside dashboard contexts (including modals) */
+.dashboard-main button.app-text-btn-gradient,
+.right-sidebar-panel button.app-text-btn-gradient {
+  color: #ffffff !important;
+  background:
+    linear-gradient(90deg, var(--dashboard-accent, #6366f1), var(--dashboard-accent-2, #14b8a6)) padding-box,
+    linear-gradient(90deg, rgba(129, 140, 248, 0.88), rgba(45, 212, 191, 0.88)) border-box !important;
+  background-color: transparent !important;
+  border: 1.5px solid transparent !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.app-text-btn-gradient:hover,
+.app-text-btn-gradient:focus,
+.app-text-btn-gradient:focus-visible {
+  filter: brightness(1.08);
+  box-shadow: none !important;
+}
+
+.dashboard-main button.app-text-btn-gradient:hover,
+.dashboard-main button.app-text-btn-gradient:focus,
+.dashboard-main button.app-text-btn-gradient:focus-visible,
+.right-sidebar-panel button.app-text-btn-gradient:hover,
+.right-sidebar-panel button.app-text-btn-gradient:focus,
+.right-sidebar-panel button.app-text-btn-gradient:focus-visible {
+  filter: brightness(1.08) !important;
+  box-shadow: none !important;
+  background:
+    linear-gradient(90deg, var(--dashboard-accent, #6366f1), var(--dashboard-accent-2, #14b8a6)) padding-box,
+    linear-gradient(90deg, rgba(129, 140, 248, 0.88), rgba(45, 212, 191, 0.88)) border-box !important;
+}
+
+.app-text-btn-gradient:active {
+  transform: translateY(1px);
+}
+
+.dashboard-main button.app-text-btn-gradient:active,
+.right-sidebar-panel button.app-text-btn-gradient:active {
+  transform: translateY(1px) !important;
+}
+
+/* Global red theme for delete buttons (labels containing "Usuń") */
+.app-text-btn-danger {
+  color: #ffffff !important;
+  background:
+    linear-gradient(90deg, #b91c1c, #ef4444) padding-box,
+    linear-gradient(90deg, rgba(252, 165, 165, 0.95), rgba(248, 113, 113, 0.95)) border-box !important;
+  border: 1.5px solid transparent !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+}
+
+.app-text-btn-danger:hover,
+.app-text-btn-danger:focus,
+.app-text-btn-danger:focus-visible {
+  filter: brightness(1.08) !important;
+  box-shadow: none !important;
+  background:
+    linear-gradient(90deg, #b91c1c, #ef4444) padding-box,
+    linear-gradient(90deg, rgba(252, 165, 165, 0.95), rgba(248, 113, 113, 0.95)) border-box !important;
+}
+
+.dashboard-main button.app-text-btn-danger,
+.right-sidebar-panel button.app-text-btn-danger {
+  color: #ffffff !important;
+  background:
+    linear-gradient(90deg, #b91c1c, #ef4444) padding-box,
+    linear-gradient(90deg, rgba(252, 165, 165, 0.95), rgba(248, 113, 113, 0.95)) border-box !important;
+  border: 1.5px solid transparent !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+}
+
+.dashboard-main button.app-text-btn-danger:hover,
+.dashboard-main button.app-text-btn-danger:focus,
+.dashboard-main button.app-text-btn-danger:focus-visible,
+.right-sidebar-panel button.app-text-btn-danger:hover,
+.right-sidebar-panel button.app-text-btn-danger:focus,
+.right-sidebar-panel button.app-text-btn-danger:focus-visible {
+  filter: brightness(1.08) !important;
+  box-shadow: none !important;
+}
+
+button.app-text-btn-gradient:disabled,
+.app-text-btn-gradient[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+  outline: 1.5px solid rgba(255,255,255,0.13) !important;
+  box-shadow: none;
+}
+
+/* Global fallback: native text buttons (without explicit icon style) */
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]) {
+  color: #ffffff;
+  background:
+    linear-gradient(90deg, var(--dashboard-accent, #6366f1), var(--dashboard-accent-2, #14b8a6)) padding-box,
+    linear-gradient(90deg, rgba(129, 140, 248, 0.88), rgba(45, 212, 191, 0.88)) border-box;
+  border: 1px solid transparent;
+  outline: none;
+  box-shadow: none;
+  transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):hover,
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus,
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):focus-visible {
+  filter: brightness(1.08);
+  box-shadow: none;
+}
+
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):active {
+  transform: translateY(1px);
+}
+
+button:not(.app-icon-btn):not(.board-actions-trigger):not(.app-text-btn-gradient):not(.right-sidebar-section-tab):not(.modal-delete-native-btn):not(.invite-select-btn):not([aria-label]):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+  outline: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+}
+
+/* Dropdown/menu guard: never apply global gradient themes inside dropdowns. */
+.board-country-menu button,
+.app-dropdown-menu button,
+[role="menu"] button,
+.dropdown-menu button {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+.board-country-menu button:hover,
+.board-country-menu button:focus,
+.board-country-menu button:focus-visible,
+.app-dropdown-menu button:hover,
+.app-dropdown-menu button:focus,
+.app-dropdown-menu button:focus-visible,
+[role="menu"] button:hover,
+[role="menu"] button:focus,
+[role="menu"] button:focus-visible,
+.dropdown-menu button:hover,
+.dropdown-menu button:focus,
+.dropdown-menu button:focus-visible {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  color: #ffffff !important;
+}
+
+.board-country-menu button.app-text-btn-gradient,
+.app-dropdown-menu button.app-text-btn-gradient,
+[role="menu"] button.app-text-btn-gradient,
+.dropdown-menu button.app-text-btn-gradient,
+.board-country-menu button.app-text-btn-danger,
+.app-dropdown-menu button.app-text-btn-danger,
+[role="menu"] button.app-text-btn-danger,
+.dropdown-menu button.app-text-btn-danger {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Invite modal user selection buttons: opt-out from global button themes */
+button.invite-select-btn {
+  width: 100%;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.85) !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 1px solid transparent !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  outline: none !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+button.invite-select-btn:hover,
+button.invite-select-btn:focus,
+button.invite-select-btn:focus-visible {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+button.invite-select-btn[data-selected="true"] {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+}
+
+button.invite-select-btn::before,
+button.invite-select-btn::after {
+  content: none !important;
+  display: none !important;
 }
 
 

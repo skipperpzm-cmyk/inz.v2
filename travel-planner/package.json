@@ -7,6 +7,7 @@
     "migrate:background": "node ./scripts/migrate-background.js",
     "migrate:background:pg": "node ./scripts/migrate-with-pg.js",
     "migrate:auto": "node ./scripts/auto-migrate.js",
+    "migrate:status": "node ./scripts/migrations-status.js",
     "build": "next build",
     "vercel-build": "next build",
     "start": "next start",

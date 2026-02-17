@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth';
+import { requireDb } from '@/src/db/db';
+import { createNotification } from '@/src/db/repositories/notifications.repository';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function POST(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+  const params = await context.params;
+  const inviteId = params.id;
+  if (!UUID_RE.test(inviteId)) return NextResponse.json({ error: 'Invalid invite id' }, { status: 400 });
+
+  try {
+    const db = requireDb();
+
+    const inviteRes = await (db as any).execute(sql`
+      select
+        bi.id,
+        bi.board_id,
+        bi.from_user_id,
+        bi.to_user_id,
+        bi.status,
+        b.group_id,
+        b.title as board_title,
+        g.name as group_name
+      from public.board_invites bi
+      join public.boards b on b.id = bi.board_id
+      join public.groups g on g.id = b.group_id
+      where (bi.id = ${inviteId}::uuid or bi.board_id = ${inviteId}::uuid)
+        and bi.to_user_id = ${user.id}
+        and bi.status = 'pending'
+      order by bi.created_at desc
+      limit 1
+    `);
+
+    const inviteRows = (inviteRes as any).rows ?? inviteRes;
+    const invite = Array.isArray(inviteRows) && inviteRows.length > 0 ? inviteRows[0] : null;
+    if (!invite) return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+
+    const membershipRes = await (db as any).execute(sql`
+      select 1
+      from public.group_members gm
+      where gm.group_id = ${invite.group_id}
+        and gm.user_id = ${user.id}
+      limit 1
+    `);
+    const membershipRows = (membershipRes as any).rows ?? membershipRes;
+    const isGroupMember = Array.isArray(membershipRows) && membershipRows.length > 0;
+    if (!isGroupMember) {
+      return NextResponse.json({ error: 'Musisz należeć do grupy, aby dołączyć do tablicy.' }, { status: 422 });
+    }
+
+    await (db as any).execute(sql`
+      insert into public.board_members (board_id, user_id, added_by)
+      values (${invite.board_id}, ${user.id}, ${invite.from_user_id})
+      on conflict (board_id, user_id) do nothing
+    `);
+
+    await (db as any).execute(sql`
+      update public.board_invites
+      set status = 'accepted', decided_at = now()
+      where id = ${inviteId}
+    `);
+
+    try {
+      await createNotification({
+        userId: String(invite.from_user_id),
+        actorUserId: user.id,
+        type: 'board_invite_accepted',
+        title: 'Zaproszenie do tablicy zaakceptowane',
+        message: `${String(invite.board_title ?? 'Tablica')} (${String(invite.group_name ?? 'Grupa')})`,
+        entityType: 'board_invite',
+        entityId: String(invite.board_id),
+        payload: {
+          inviteId,
+          boardId: String(invite.board_id),
+          acceptedBy: user.id,
+        },
+      });
+    } catch (notificationErr) {
+      console.error('board invite accept notification error', notificationErr);
+    }
+
+    return NextResponse.json({
+      success: true,
+      boardId: String(invite.board_id),
+      groupId: String(invite.group_id),
+    });
+  } catch (err) {
+    console.error('board invite accept error', err);
+    return NextResponse.json({ error: 'Failed to accept invite' }, { status: 500 });
+  }
+}

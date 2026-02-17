@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { sqlClient } from "@/src/db/db";
+import { createNotification } from "@/src/db/repositories/notifications.repository";
 
 type DbClient = NonNullable<typeof sqlClient>;
 
@@ -73,12 +74,37 @@ export const POST = async (
       `;
       if (Array.isArray(memberRows) && memberRows.length > 0) continue;
 
-      await db`
+      const insertRows = await db`
         insert into public.group_invites (group_id, from_user_id, to_user_id, status, created_at)
         values (${group.id}, ${user.id}, ${targetId}, 'pending', now())
         on conflict do nothing
+        returning id
       `;
-      invited += 1;
+
+      if (Array.isArray(insertRows) && insertRows.length > 0) {
+        invited += 1;
+        const inviteId = String(insertRows[0].id);
+        try {
+          await createNotification({
+            userId: targetId,
+            actorUserId: user.id,
+            type: 'group_invite',
+            title: 'Nowe zaproszenie do grupy',
+            message: 'Otrzymano zaproszenie do grupy.',
+            entityType: 'group_invite',
+            entityId: inviteId,
+            payload: {
+              inviteId,
+              groupId: String(group.id),
+              groupSlug: slug,
+              fromUserId: user.id,
+              toUserId: targetId,
+            },
+          });
+        } catch (notificationErr) {
+          console.error('Failed to create group invite notification', notificationErr);
+        }
+      }
     }
 
     return NextResponse.json({ invited });

@@ -9,6 +9,7 @@ import GroupRenameForm from "./GroupRenameForm";
 import GroupAvatarPicker from "./GroupAvatarPicker";
 import GroupMemberList from "./GroupMemberList";
 import GroupInviteList from "./GroupInviteList";
+import Button from "../ui/button";
 
 type Props = {
   groupId: string | null;
@@ -113,14 +114,14 @@ export default function GroupManagementPanel({ groupId, open, onClose }: Props) 
                     {/* Możesz dodać tu edycję opisu */}
                     {isOwner && (
                       <div className="mt-6">
-                        <button
+                        <Button
                           type="button"
-                          className="w-full py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition disabled:opacity-60"
+                          className="w-full"
                           onClick={() => setDeleteConfirm(true)}
                           disabled={deleteLoading}
                         >
                           Usuń grupę
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -143,7 +144,7 @@ export default function GroupManagementPanel({ groupId, open, onClose }: Props) 
                     <div className="flex gap-3 justify-end">
                       <button
                         type="button"
-                        className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold"
+                        className="modal-delete-native-btn px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold"
                         onClick={() => setDeleteConfirm(false)}
                         disabled={deleteLoading}
                       >
@@ -151,7 +152,7 @@ export default function GroupManagementPanel({ groupId, open, onClose }: Props) 
                       </button>
                       <button
                         type="button"
-                        className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+                        className="modal-delete-native-btn px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
                         onClick={handleDeleteGroup}
                         disabled={deleteLoading}
                       >
