@@ -2,9 +2,31 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getBrowserSupabase } from '../lib/supabaseClient';
-import type { BoardComment, BoardDetail, BoardModerator, BoardPost, BoardTravelInfo } from '../types/board';
+import type { BoardComment, BoardDetail, BoardModerator, BoardPost, BoardPostAttachment, BoardTravelInfo, ComposerState, TripActivity, TripDay } from '../types/board';
 
 type LoadPostsResult = { nextCursor: string | null; hasMore: boolean };
+
+type TripDayInput = {
+  title?: string | null;
+  date?: string | null;
+  location?: string | null;
+  description?: string | null;
+  accommodation?: string | null;
+  estimatedBudget?: number | null;
+};
+
+type TripActivityInput = {
+  time?: string | null;
+  title: string;
+  description?: string | null;
+  cost?: number | null;
+};
+
+type PostCreateInput = {
+  content: string;
+  mentions?: string[];
+  attachments?: BoardPostAttachment[];
+};
 
 type BoardDetailContextValue = {
   currentUserId: string | null;
@@ -15,7 +37,10 @@ type BoardDetailContextValue = {
   canModerate: boolean;
   activeBoardStatus: number | null;
   posts: BoardPost[];
+  tripDays: TripDay[];
+  loadingTripDays: boolean;
   comments: Record<string, BoardComment[]>;
+  composerState: ComposerState;
   postsNextCursor: string | null;
   hasMorePosts: boolean;
   loadingMorePosts: boolean;
@@ -24,11 +49,21 @@ type BoardDetailContextValue = {
   loadBoard: (groupId: string, boardId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   loadPosts: (groupId: string, boardId: string, opts?: { signal?: AbortSignal; cursor?: string | null; append?: boolean }) => Promise<LoadPostsResult>;
   loadMorePosts: (groupId: string, boardId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
-  createPost: (groupId: string, boardId: string, content: string, opts?: { signal?: AbortSignal }) => Promise<void>;
+  createPost: (groupId: string, boardId: string, payload: PostCreateInput, opts?: { signal?: AbortSignal }) => Promise<void>;
   deletePost: (postId: string) => Promise<void>;
   createComment: (postId: string, content: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   deleteComment: (commentId: string) => Promise<void>;
   loadMoreComments: (postId: string) => Promise<void>;
+  loadTripDays: (groupId: string, boardId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
+  addTripDay: (groupId: string, boardId: string, payload?: TripDayInput, opts?: { signal?: AbortSignal }) => Promise<void>;
+  updateTripDay: (groupId: string, boardId: string, dayId: string, payload: TripDayInput, opts?: { signal?: AbortSignal }) => Promise<void>;
+  deleteTripDay: (groupId: string, boardId: string, dayId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
+  reorderTripDays: (groupId: string, boardId: string, orderedDayIds: string[], opts?: { signal?: AbortSignal }) => Promise<void>;
+  addTripActivity: (groupId: string, boardId: string, dayId: string, payload: TripActivityInput, opts?: { signal?: AbortSignal }) => Promise<void>;
+  updateTripActivity: (groupId: string, boardId: string, dayId: string, activityId: string, payload: TripActivityInput, opts?: { signal?: AbortSignal }) => Promise<void>;
+  deleteTripActivity: (groupId: string, boardId: string, dayId: string, activityId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
+  setComposerState: (next: Partial<ComposerState>) => void;
+  insertEmoji: (emoji: string) => void;
   loadModerators: (boardId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   addModerator: (boardId: string, userId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
   removeModerator: (boardId: string, userId: string, opts?: { signal?: AbortSignal }) => Promise<void>;
@@ -54,6 +89,14 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
   const [moderators, setModerators] = useState<BoardModerator[]>([]);
   const [activeBoardStatus, setActiveBoardStatus] = useState<number | null>(null);
   const [posts, setPosts] = useState<BoardPost[]>([]);
+  const [tripDays, setTripDays] = useState<TripDay[]>([]);
+  const [loadingTripDays, setLoadingTripDays] = useState(false);
+  const [composerState, setComposerStateState] = useState<ComposerState>({
+    content: '',
+    selectionStart: 0,
+    selectionEnd: 0,
+    mentions: [],
+  });
   const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
   const [hasMorePosts, setHasMorePosts] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
@@ -62,12 +105,15 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
 
   const boardAbortRef = useRef<AbortController | null>(null);
   const postsAbortRef = useRef<AbortController | null>(null);
+  const tripDaysAbortRef = useRef<AbortController | null>(null);
   const activeScopeRef = useRef<{ groupId: string; boardId: string } | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadPostsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadBoardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reloadModeratorsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadTripDaysTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadPostsInFlightRef = useRef(false);
+  const loadTripDaysInFlightRef = useRef(false);
   const commentLoadMoreCursorRef = useRef<Record<string, string | null>>({});
   const commentAddThrottleRef = useRef<Record<string, number>>({});
   const postsNextCursorRef = useRef<string | null>(null);
@@ -83,10 +129,331 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
     setModerators([]);
     setActiveBoardStatus(null);
     setPosts([]);
+    setTripDays([]);
+    setLoadingTripDays(false);
+    setComposerStateState({
+      content: '',
+      selectionStart: 0,
+      selectionEnd: 0,
+      mentions: [],
+    });
     setPostsNextCursor(null);
     setHasMorePosts(false);
     commentLoadMoreCursorRef.current = {};
     activeScopeRef.current = null;
+  }, []);
+
+  const normalizeTripDays = useCallback((value: unknown): TripDay[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry: any) => ({
+        id: String(entry?.id ?? ''),
+        boardId: String(entry?.boardId ?? ''),
+        dayNumber: Number(entry?.dayNumber ?? 0),
+        title: typeof entry?.title === 'string' ? entry.title : null,
+        date: typeof entry?.date === 'string' ? entry.date : null,
+        location: typeof entry?.location === 'string' ? entry.location : null,
+        description: typeof entry?.description === 'string' ? entry.description : null,
+        accommodation: typeof entry?.accommodation === 'string' ? entry.accommodation : null,
+        estimatedBudget: entry?.estimatedBudget != null && Number.isFinite(Number(entry.estimatedBudget))
+          ? Number(entry.estimatedBudget)
+          : null,
+        activities: Array.isArray(entry?.activities)
+          ? entry.activities.map((activity: any) => ({
+              id: String(activity?.id ?? ''),
+              dayId: String(activity?.dayId ?? ''),
+              time: typeof activity?.time === 'string' ? activity.time : null,
+              title: String(activity?.title ?? ''),
+              description: typeof activity?.description === 'string' ? activity.description : null,
+              cost: activity?.cost != null && Number.isFinite(Number(activity.cost)) ? Number(activity.cost) : null,
+              createdAt: String(activity?.createdAt ?? new Date().toISOString()),
+              updatedAt: String(activity?.updatedAt ?? new Date().toISOString()),
+            } as TripActivity))
+          : [],
+        createdAt: String(entry?.createdAt ?? new Date().toISOString()),
+        updatedAt: String(entry?.updatedAt ?? new Date().toISOString()),
+      } as TripDay))
+      .filter((day) => day.id && day.boardId)
+      .sort((a, b) => (a.dayNumber - b.dayNumber) || (a.createdAt < b.createdAt ? -1 : 1));
+  }, []);
+
+  const loadTripDays = useCallback(async (groupId: string, boardId: string, opts?: { signal?: AbortSignal }) => {
+    if (loadTripDaysInFlightRef.current) return;
+
+    tripDaysAbortRef.current?.abort();
+    const controller = opts?.signal ? null : new AbortController();
+    if (controller) tripDaysAbortRef.current = controller;
+
+    loadTripDaysInFlightRef.current = true;
+    setLoadingTripDays(true);
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days`, {
+        credentials: 'include',
+        cache: 'no-store',
+        signal: opts?.signal ?? controller?.signal,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się pobrać planu podróży');
+      setTripDays(normalizeTripDays(json?.tripDays));
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się pobrać planu podróży');
+    } finally {
+      loadTripDaysInFlightRef.current = false;
+      setLoadingTripDays(false);
+    }
+  }, [normalizeTripDays]);
+
+  const addTripDay = useCallback(async (groupId: string, boardId: string, payload?: TripDayInput, opts?: { signal?: AbortSignal }) => {
+    setError(null);
+    const optimisticId = `temp-trip-day-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    setTripDays((prev) => {
+      const nextNumber = prev.length + 1;
+      return [...prev, {
+        id: optimisticId,
+        boardId,
+        dayNumber: nextNumber,
+        title: payload?.title ?? `Dzień ${nextNumber}`,
+        date: payload?.date ?? null,
+        location: payload?.location ?? null,
+        description: payload?.description ?? null,
+        accommodation: payload?.accommodation ?? null,
+        estimatedBudget: payload?.estimatedBudget ?? null,
+        activities: [],
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }];
+    });
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify(payload ?? {}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się dodać dnia podróży');
+      if (Array.isArray(json?.tripDays)) {
+        setTripDays(normalizeTripDays(json.tripDays));
+      } else {
+        await loadTripDays(groupId, boardId, opts);
+      }
+    } catch (err) {
+      setTripDays((prev) => prev.filter((entry) => entry.id !== optimisticId));
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się dodać dnia podróży');
+      throw err instanceof Error ? err : new Error('Nie udało się dodać dnia podróży');
+    }
+  }, [loadTripDays, normalizeTripDays]);
+
+  const updateTripDay = useCallback(async (groupId: string, boardId: string, dayId: string, payload: TripDayInput, opts?: { signal?: AbortSignal }) => {
+    if (!dayId) return;
+    setError(null);
+    const snapshot = tripDays;
+    setTripDays((prev) => prev.map((day) => day.id === dayId ? {
+      ...day,
+      ...payload,
+      updatedAt: new Date().toISOString(),
+    } : day));
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days/${encodeURIComponent(dayId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się zapisać dnia podróży');
+    } catch (err) {
+      setTripDays(snapshot);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się zapisać dnia podróży');
+      throw err instanceof Error ? err : new Error('Nie udało się zapisać dnia podróży');
+    }
+  }, [tripDays]);
+
+  const deleteTripDay = useCallback(async (groupId: string, boardId: string, dayId: string, opts?: { signal?: AbortSignal }) => {
+    if (!dayId) return;
+    setError(null);
+    const snapshot = tripDays;
+    setTripDays((prev) => prev.filter((day) => day.id !== dayId).map((day, index) => ({ ...day, dayNumber: index + 1 })));
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days/${encodeURIComponent(dayId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        signal: opts?.signal,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się usunąć dnia podróży');
+      await loadTripDays(groupId, boardId, opts);
+    } catch (err) {
+      setTripDays(snapshot);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się usunąć dnia podróży');
+      throw err instanceof Error ? err : new Error('Nie udało się usunąć dnia podróży');
+    }
+  }, [loadTripDays, tripDays]);
+
+  const reorderTripDays = useCallback(async (groupId: string, boardId: string, orderedDayIds: string[], opts?: { signal?: AbortSignal }) => {
+    if (orderedDayIds.length === 0) return;
+    setError(null);
+    const snapshot = tripDays;
+    setTripDays((prev) => {
+      const map = new Map(prev.map((day) => [day.id, day]));
+      return orderedDayIds.map((id, index) => ({ ...(map.get(id) as TripDay), dayNumber: index + 1 }));
+    });
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify({ dayIds: orderedDayIds }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się zmienić kolejności dni');
+      if (Array.isArray(json?.tripDays)) {
+        setTripDays(normalizeTripDays(json.tripDays));
+      }
+    } catch (err) {
+      setTripDays(snapshot);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się zmienić kolejności dni');
+      throw err instanceof Error ? err : new Error('Nie udało się zmienić kolejności dni');
+    }
+  }, [normalizeTripDays, tripDays]);
+
+  const addTripActivity = useCallback(async (groupId: string, boardId: string, dayId: string, payload: TripActivityInput, opts?: { signal?: AbortSignal }) => {
+    if (!dayId) return;
+    setError(null);
+    const optimisticId = `temp-activity-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    setTripDays((prev) => prev.map((day) => day.id === dayId
+      ? {
+          ...day,
+          activities: [...day.activities, {
+            id: optimisticId,
+            dayId,
+            time: payload.time ?? null,
+            title: payload.title,
+            description: payload.description ?? null,
+            cost: payload.cost ?? null,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          }],
+        }
+      : day));
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days/${encodeURIComponent(dayId)}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się dodać aktywności');
+      await loadTripDays(groupId, boardId, opts);
+    } catch (err) {
+      setTripDays((prev) => prev.map((day) => day.id === dayId
+        ? { ...day, activities: day.activities.filter((activity) => activity.id !== optimisticId) }
+        : day));
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się dodać aktywności');
+      throw err instanceof Error ? err : new Error('Nie udało się dodać aktywności');
+    }
+  }, [loadTripDays]);
+
+  const updateTripActivity = useCallback(async (groupId: string, boardId: string, dayId: string, activityId: string, payload: TripActivityInput, opts?: { signal?: AbortSignal }) => {
+    if (!dayId || !activityId) return;
+    setError(null);
+    const snapshot = tripDays;
+
+    setTripDays((prev) => prev.map((day) => day.id === dayId
+      ? {
+          ...day,
+          activities: day.activities.map((activity) => activity.id === activityId
+            ? { ...activity, ...payload, updatedAt: new Date().toISOString() }
+            : activity),
+        }
+      : day));
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(activityId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal: opts?.signal,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się zapisać aktywności');
+    } catch (err) {
+      setTripDays(snapshot);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się zapisać aktywności');
+      throw err instanceof Error ? err : new Error('Nie udało się zapisać aktywności');
+    }
+  }, [tripDays]);
+
+  const deleteTripActivity = useCallback(async (groupId: string, boardId: string, dayId: string, activityId: string, opts?: { signal?: AbortSignal }) => {
+    if (!dayId || !activityId) return;
+    setError(null);
+    const snapshot = tripDays;
+
+    setTripDays((prev) => prev.map((day) => day.id === dayId
+      ? { ...day, activities: day.activities.filter((activity) => activity.id !== activityId) }
+      : day));
+
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(groupId)}/${encodeURIComponent(boardId)}/trip-days/${encodeURIComponent(dayId)}/activities/${encodeURIComponent(activityId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        signal: opts?.signal,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json?.error || 'Nie udało się usunąć aktywności');
+    } catch (err) {
+      setTripDays(snapshot);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Nie udało się usunąć aktywności');
+      throw err instanceof Error ? err : new Error('Nie udało się usunąć aktywności');
+    }
+  }, [tripDays]);
+
+  const setComposerState = useCallback((next: Partial<ComposerState>) => {
+    setComposerStateState((prev) => ({
+      ...prev,
+      content: typeof next.content === 'string' ? next.content : prev.content,
+      selectionStart: typeof next.selectionStart === 'number' ? next.selectionStart : prev.selectionStart,
+      selectionEnd: typeof next.selectionEnd === 'number' ? next.selectionEnd : prev.selectionEnd,
+      mentions: Array.isArray(next.mentions) ? next.mentions : prev.mentions,
+    }));
+  }, []);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    setComposerStateState((prev) => {
+      const start = Math.max(0, Math.min(prev.selectionStart, prev.content.length));
+      const end = Math.max(start, Math.min(prev.selectionEnd, prev.content.length));
+      const nextContent = `${prev.content.slice(0, start)}${emoji}${prev.content.slice(end)}`;
+      const cursor = start + emoji.length;
+      return {
+        ...prev,
+        content: nextContent,
+        selectionStart: cursor,
+        selectionEnd: cursor,
+      };
+    });
   }, []);
 
   const loadModerators = useCallback(async (boardId: string, opts?: { signal?: AbortSignal }) => {
@@ -226,21 +593,20 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       setActiveBoard(data as BoardDetail);
       setActiveBoardStatus(200);
       await loadModerators(boardId, opts);
+      await loadTripDays(groupId, boardId, opts);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Nie udało się pobrać tablicy');
       setActiveBoard(null);
       setModerators([]);
+      setTripDays([]);
     } finally {
       setLoading(false);
     }
-  }, [loadModerators]);
+  }, [loadModerators, loadTripDays]);
 
   const loadPosts = useCallback(async (groupId: string, boardId: string, opts?: { signal?: AbortSignal; cursor?: string | null; append?: boolean }) => {
     const isAppend = Boolean(opts?.append);
-    if (loadPostsInFlightRef.current && !isAppend) {
-      return { nextCursor: postsNextCursorRef.current, hasMore: hasMorePostsRef.current };
-    }
 
     if (!isAppend) {
       postsAbortRef.current?.abort();
@@ -318,9 +684,21 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
     await loadPosts(groupId, boardId, { signal: opts?.signal, cursor: postsNextCursor, append: true });
   }, [hasMorePosts, loadPosts, postsNextCursor]);
 
-  const createPost = useCallback(async (groupId: string, boardId: string, content: string, opts?: { signal?: AbortSignal }) => {
-    const text = content.trim();
-    if (!text) return;
+  const createPost = useCallback(async (groupId: string, boardId: string, payload: PostCreateInput, opts?: { signal?: AbortSignal }) => {
+    const text = payload.content.trim();
+    const attachments = Array.isArray(payload.attachments)
+      ? payload.attachments.slice(0, 8)
+      : [];
+    if (!text && attachments.length === 0) return;
+    if (text.length > 5000) {
+      const message = 'Treść posta nie może przekraczać 5000 znaków';
+      setError(message);
+      throw new Error(message);
+    }
+
+    const mentions = Array.isArray(payload.mentions)
+      ? Array.from(new Set(payload.mentions.map((entry) => String(entry).trim()).filter(Boolean))).slice(0, 20)
+      : [];
 
     const optimisticId = `temp-post-${Date.now()}`;
     const optimisticPost: BoardPost = {
@@ -331,6 +709,8 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       authorName: currentUserName,
       authorAvatarUrl: currentUserAvatar,
       content: text,
+      attachments,
+      mentions: mentions.map((entry) => ({ userId: '', name: entry })),
       createdAt: new Date().toISOString(),
       comments: [],
     };
@@ -343,7 +723,11 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         signal: opts?.signal,
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({
+          content: text,
+          mentions,
+          attachments,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || json?.error) {
@@ -359,6 +743,12 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
             if (!map.has(entry.id)) map.set(entry.id, entry);
           });
           return Array.from(map.values());
+        });
+        setComposerStateState({
+          content: '',
+          selectionStart: 0,
+          selectionEnd: 0,
+          mentions: [],
         });
       } else {
         await loadPosts(groupId, boardId, { cursor: null, append: false });
@@ -605,6 +995,8 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
     let commentsChannel: ReturnType<typeof supabase.channel> | null = null;
     let boardChannel: ReturnType<typeof supabase.channel> | null = null;
     let moderatorsChannel: ReturnType<typeof supabase.channel> | null = null;
+    let tripDaysChannel: ReturnType<typeof supabase.channel> | null = null;
+    let tripActivitiesChannel: ReturnType<typeof supabase.channel> | null = null;
 
     const refreshRealtimeToken = async () => {
       try {
@@ -647,6 +1039,13 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
         }, 120);
       };
 
+      const scheduleTripDaysReload = () => {
+        if (reloadTripDaysTimerRef.current) clearTimeout(reloadTripDaysTimerRef.current);
+        reloadTripDaysTimerRef.current = setTimeout(() => {
+          void loadTripDays(activeBoard.groupId, activeBoard.id);
+        }, 120);
+      };
+
       const handleChannelStatus = (status: string) => {
         if (cancelled) return;
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -656,6 +1055,7 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
             void loadPosts(activeBoard.groupId, activeBoard.id, { cursor: null, append: false });
             void loadBoard(activeBoard.groupId, activeBoard.id);
             void loadModerators(activeBoard.id);
+            void loadTripDays(activeBoard.groupId, activeBoard.id);
           }, 1000);
         }
       };
@@ -695,6 +1095,24 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
           scheduleModeratorsReload
         )
         .subscribe((status) => handleChannelStatus(status));
+
+      tripDaysChannel = supabase
+        .channel(`board-trip-days:${activeBoard.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'board_trip_days', filter: `board_id=eq.${activeBoard.id}` },
+          scheduleTripDaysReload
+        )
+        .subscribe((status) => handleChannelStatus(status));
+
+      tripActivitiesChannel = supabase
+        .channel(`board-trip-activities:${activeBoard.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'board_trip_activities' },
+          scheduleTripDaysReload
+        )
+        .subscribe((status) => handleChannelStatus(status));
     })();
 
     return () => {
@@ -703,12 +1121,15 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       if (reloadPostsTimerRef.current) clearTimeout(reloadPostsTimerRef.current);
       if (reloadBoardTimerRef.current) clearTimeout(reloadBoardTimerRef.current);
       if (reloadModeratorsTimerRef.current) clearTimeout(reloadModeratorsTimerRef.current);
+      if (reloadTripDaysTimerRef.current) clearTimeout(reloadTripDaysTimerRef.current);
       if (postsChannel) supabase.removeChannel(postsChannel);
       if (commentsChannel) supabase.removeChannel(commentsChannel);
       if (boardChannel) supabase.removeChannel(boardChannel);
       if (moderatorsChannel) supabase.removeChannel(moderatorsChannel);
+      if (tripDaysChannel) supabase.removeChannel(tripDaysChannel);
+      if (tripActivitiesChannel) supabase.removeChannel(tripActivitiesChannel);
     };
-  }, [activeBoard?.groupId, activeBoard?.id, loadBoard, loadModerators, loadPosts]);
+  }, [activeBoard?.groupId, activeBoard?.id, loadBoard, loadModerators, loadPosts, loadTripDays]);
 
   const isOwner = useMemo(() => {
     if (!activeBoard || !currentUserId) return false;
@@ -728,6 +1149,7 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
     return () => {
       boardAbortRef.current?.abort();
       postsAbortRef.current?.abort();
+      tripDaysAbortRef.current?.abort();
     };
   }, []);
 
@@ -741,7 +1163,10 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       canModerate,
       activeBoardStatus,
       posts,
+      tripDays,
+      loadingTripDays,
       comments,
+      composerState,
       postsNextCursor,
       hasMorePosts,
       loadingMorePosts,
@@ -755,6 +1180,16 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       createComment,
       deleteComment,
       loadMoreComments,
+      loadTripDays,
+      addTripDay,
+      updateTripDay,
+      deleteTripDay,
+      reorderTripDays,
+      addTripActivity,
+      updateTripActivity,
+      deleteTripActivity,
+      setComposerState,
+      insertEmoji,
       loadModerators,
       addModerator,
       removeModerator,
@@ -771,7 +1206,10 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       canModerate,
       activeBoardStatus,
       posts,
+      tripDays,
+      loadingTripDays,
       comments,
+      composerState,
       postsNextCursor,
       hasMorePosts,
       loadingMorePosts,
@@ -785,6 +1223,16 @@ export function BoardDetailProvider({ children }: { children: React.ReactNode })
       createComment,
       deleteComment,
       loadMoreComments,
+      loadTripDays,
+      addTripDay,
+      updateTripDay,
+      deleteTripDay,
+      reorderTripDays,
+      addTripActivity,
+      updateTripActivity,
+      deleteTripActivity,
+      setComposerState,
+      insertEmoji,
       loadModerators,
       addModerator,
       removeModerator,

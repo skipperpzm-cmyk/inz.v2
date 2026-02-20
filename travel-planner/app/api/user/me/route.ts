@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '../../../../lib/auth';
+import { getCurrentUserWithReason } from '../../../../lib/auth';
 import { updateUsername, updateBackgroundUrl } from 'src/db/repositories/user.repository';
-import { requireDb } from '@/src/db/db';
-import { sql } from 'drizzle-orm';
+import { setOnlineStatus } from 'src/db/repositories/profile.repository';
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  const auth = await getCurrentUserWithReason();
+  if (!auth.user) {
+    if (auth.reason === 'db-timeout') {
+      return NextResponse.json(
+        { error: 'Auth lookup timeout', code: 'AUTH_DB_TIMEOUT', retryable: true },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+  const user = auth.user;
   // Return minimal public info. Slug fields removed from API surface.
   return NextResponse.json({
     id: user.id,
@@ -20,8 +28,17 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  const auth = await getCurrentUserWithReason();
+  if (!auth.user) {
+    if (auth.reason === 'db-timeout') {
+      return NextResponse.json(
+        { error: 'Auth lookup timeout', code: 'AUTH_DB_TIMEOUT', retryable: true },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+  const user = auth.user;
 
   let body: { username?: string; backgroundUrl?: string | null; heartbeat?: boolean } = {} as any;
   try {
@@ -33,8 +50,7 @@ export async function PATCH(req: Request) {
   // Heartbeat: update online and last_online_at
   if (body.heartbeat === true) {
     try {
-      const db = requireDb();
-      await db.execute(sql`UPDATE public.profiles SET online = true, last_online_at = now() WHERE id = ${user.id}`);
+      await setOnlineStatus(user.id, true);
       return NextResponse.json({ ok: true });
     } catch (err) {
       return NextResponse.json({ error: 'Failed to update heartbeat' }, { status: 500 });

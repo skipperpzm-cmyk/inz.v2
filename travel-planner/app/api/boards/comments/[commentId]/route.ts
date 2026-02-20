@@ -28,6 +28,7 @@ export async function DELETE(_request: Request, context: Params) {
 
     const access = await getBoardAccessForUser(userId, String(row.board_id));
     if (!access || !access.isMember) return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    if (access.isArchived) return NextResponse.json({ error: 'Archived board is read-only' }, { status: 409 });
 
     const canDelete = String(row.author_id) === String(userId) || access.canModerate;
     if (!canDelete) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

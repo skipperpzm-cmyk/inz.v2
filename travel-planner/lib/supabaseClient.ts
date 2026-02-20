@@ -34,10 +34,14 @@ export function getServerSupabase() {
  * up users in the auth schema. Ensure SUPABASE_SERVICE_ROLE_KEY is set.
  */
 export function getServiceSupabase() {
-  const url = process.env.SUPABASE_URL as string;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) as string;
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SERVICE_ROLE_KEY) as string;
   if (!url || !key) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+    const missing = [
+      !url ? 'SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)' : null,
+      !key ? 'SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY / SERVICE_ROLE_KEY)' : null,
+    ].filter(Boolean).join(', ');
+    throw new Error(`Missing Supabase service env: ${missing}`);
   }
   return createClient(url, key, { auth: { persistSession: false } });
 }

@@ -765,6 +765,41 @@ body[style*="padding-right"] {
   display: none !important;
 }
 
+.dashboard-main button.board-text-action-btn {
+  border: 0 !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  -webkit-box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  padding: 0 !important;
+  min-height: auto !important;
+}
+
+.dashboard-main button.board-text-action-btn:hover,
+.dashboard-main button.board-text-action-btn:focus,
+.dashboard-main button.board-text-action-btn:focus-visible,
+.dashboard-main button.board-text-action-btn:active {
+  border: 0 !important;
+  border-width: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  -webkit-box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.dashboard-main button.board-text-action-btn::before,
+.dashboard-main button.board-text-action-btn::after {
+  content: none !important;
+  display: none !important;
+}
+
 .dashboard-main button.board-country-trigger {
   border: 1px solid rgba(255, 255, 255, 0.10) !important;
   border-width: 1px !important;
@@ -934,20 +969,30 @@ body[style*="padding-right"] {
   transform: none !important;
 }
 
-.dashboard-main button.board-actions-trigger:hover,
 .dashboard-main button.board-actions-trigger:focus,
 .dashboard-main button.board-actions-trigger:focus-visible,
 .dashboard-main button.board-actions-trigger:active,
-.dashboard-main button.app-icon-btn:hover,
 .dashboard-main button.app-icon-btn:focus,
 .dashboard-main button.app-icon-btn:focus-visible,
 .dashboard-main button.app-icon-btn:active {
-  background-color: rgba(255,255,255,0.10) !important;
+  background-color: rgba(255,255,255,0.06) !important;
   color: #ffffff !important;
   border-color: transparent !important;
   box-shadow: none !important;
   -webkit-box-shadow: none !important;
   outline: none !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-main button.board-actions-trigger:hover,
+  .dashboard-main button.app-icon-btn:hover {
+    background-color: rgba(255,255,255,0.10) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    outline: none !important;
+  }
 }
 
 .dashboard-main button.board-actions-trigger::before,
@@ -1020,15 +1065,190 @@ body[style*="padding-right"] {
   transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
-.app-icon-btn:hover,
 .app-icon-btn:focus,
 .app-icon-btn:focus-visible,
 .app-icon-btn:active {
+  background-color: rgba(255,255,255,0.06);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .app-icon-btn:hover {
   background-color: rgba(255,255,255,0.10);
   color: #ffffff;
   border-color: transparent;
   box-shadow: none;
   outline: none;
+  }
+}
+
+.app-icon-btn-sm {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.app-icon-btn-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto;
+  height: auto;
+  padding: 0.55rem 0.8rem;
+}
+
+.app-icon-btn-row:hover,
+.app-icon-btn-row:focus,
+.app-icon-btn-row:focus-visible,
+.app-icon-btn-row:active,
+.app-icon-btn-row-active {
+  outline: none;
+}
+
+.app-icon-btn-row:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.composer-emoji-picker {
+  --epr-bg-color: rgba(15, 23, 42, 0.95);
+  --epr-text-color: rgba(255, 255, 255, 0.92);
+  --epr-search-input-bg-color: rgba(255, 255, 255, 0.06);
+  --epr-search-border-color: rgba(255, 255, 255, 0.16);
+  --epr-category-label-bg-color: rgba(15, 23, 42, 0.96);
+  --epr-category-icon-active-color: rgba(255, 255, 255, 0.92);
+  --epr-category-icon-disabled-color: rgba(255, 255, 255, 0.4);
+  --epr-highlight-color: rgba(255, 255, 255, 0.16);
+  --epr-hover-bg-color: rgba(255, 255, 255, 0.1);
+  --epr-focus-bg-color: rgba(255, 255, 255, 0.12);
+  --epr-picker-border-color: rgba(255, 255, 255, 0.08);
+  --epr-search-border-color-active: rgba(255, 255, 255, 0.3);
+  --epr-emoji-variation-indicator-color: rgba(255, 255, 255, 0.35);
+  --epr-emoji-variation-indicator-color-hover: rgba(255, 255, 255, 0.55);
+
+  --epr-dark-highlight-color: rgba(255, 255, 255, 0.22);
+  --epr-dark-text-color: rgba(255, 255, 255, 0.92);
+  --epr-dark-hover-bg-color: rgba(255, 255, 255, 0.1);
+  --epr-dark-hover-bg-color-reduced-opacity: rgba(255, 255, 255, 0.08);
+  --epr-dark-focus-bg-color: rgba(255, 255, 255, 0.14);
+  --epr-dark-search-input-bg-color: rgba(255, 255, 255, 0.06);
+  --epr-dark-search-input-bg-color-active: rgba(255, 255, 255, 0.1);
+  --epr-dark-category-label-bg-color: rgba(15, 23, 42, 0.96);
+  --epr-dark-picker-border-color: rgba(255, 255, 255, 0.08);
+  --epr-dark-bg-color: rgba(15, 23, 42, 0.95);
+  --epr-dark-reactions-bg-color: rgba(15, 23, 42, 0.9);
+  --epr-dark-emoji-variation-picker-bg-color: rgba(15, 23, 42, 0.95);
+  --epr-dark-emoji-variation-indicator-color: rgba(255, 255, 255, 0.35);
+  --epr-dark-category-icon-active-color: rgba(255, 255, 255, 0.92);
+  --epr-dark-skin-tone-picker-menu-color: rgba(15, 23, 42, 0.95);
+  --epr-dark-skin-tone-outer-border-color: rgba(255, 255, 255, 0.16);
+  --epr-dark-skin-tone-inner-border-color: transparent;
+  --epr-active-skin-tone-indicator-border-color: rgba(255, 255, 255, 0.92);
+  --epr-category-navigation-button-size: 30px;
+}
+
+.composer-emoji-picker .epr-category-nav button[aria-selected='true'],
+.composer-emoji-picker .epr-category-nav .epr-btn[aria-selected='true'] {
+  border-color: rgba(255, 255, 255, 0.92) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.composer-emoji-picker .epr-btn,
+.composer-emoji-picker button {
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  filter: none !important;
+  transform: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.composer-emoji-picker .epr-btn:hover,
+.composer-emoji-picker .epr-btn:focus,
+.composer-emoji-picker .epr-btn:focus-visible,
+.composer-emoji-picker .epr-btn:active,
+.composer-emoji-picker button:hover,
+.composer-emoji-picker button:focus,
+.composer-emoji-picker button:focus-visible,
+.composer-emoji-picker button:active {
+  border-width: 0 !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.composer-emoji-picker .epr-emoji:hover,
+.composer-emoji-picker .epr-emoji:focus,
+.composer-emoji-picker .epr-emoji:focus-visible,
+.composer-emoji-picker .epr-emoji:active {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.composer-emoji-picker .epr-cat-btn:hover,
+.composer-emoji-picker .epr-cat-btn:focus,
+.composer-emoji-picker .epr-cat-btn:focus-visible,
+.composer-emoji-picker .epr-cat-btn:active,
+.composer-emoji-picker .epr-cat-btn.epr-active {
+  border-radius: 8px !important;
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.composer-emoji-picker .epr-search-container .epr-icn-search {
+  top: 50% !important;
+  left: var(--epr-search-bar-inner-padding) !important;
+  width: 20px !important;
+  height: 20px !important;
+  transform: translateY(-50%) !important;
+  display: block !important;
+  background-size: 20px !important;
+  background-position: 0 0 !important;
+}
+
+.dashboard-main .card:hover .composer-emoji-picker .epr-search-container .epr-icn-search,
+.dashboard-main .dashboard-card:hover .composer-emoji-picker .epr-search-container .epr-icn-search {
+  transform: translateY(-50%) !important;
+}
+
+.composer-emoji-picker .epr-search-container .epr-icn-search::before,
+.composer-emoji-picker .epr-search-container .epr-icn-search::after {
+  content: none !important;
+  display: none !important;
+}
+
+.composer-emoji-picker.epr-search-active .epr-category-nav,
+.composer-emoji-picker:has(input:not(:placeholder-shown)) .epr-category-nav {
+  opacity: 1 !important;
+  filter: none !important;
+  pointer-events: auto !important;
+}
+
+.composer-emoji-picker .epr-category-nav {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 8 !important;
+  background-color: var(--epr-bg-color) !important;
+}
+
+.composer-emoji-picker .epr-emoji-category-label {
+  position: static !important;
+  top: auto !important;
+  z-index: auto !important;
 }
 
 /* Global button theme: text buttons with gradient */

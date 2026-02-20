@@ -18,7 +18,7 @@ export async function GET() {
         max(case when bm.id is not null then coalesce(gp.created_at, b.updated_at, b.created_at) end) as last_activity
       from public.groups g
       join public.group_members gm on gm.group_id = g.id and gm.user_id = ${userId}
-      left join public.boards b on b.group_id = g.id
+      left join public.boards b on b.group_id = g.id and coalesce(nullif(b.details->>'archivedAt', ''), '') = ''
       left join public.board_members bm on bm.board_id = b.id and bm.user_id = ${userId}
       left join public.group_posts gp on gp.board_id = b.id
       group by g.id, g.name, g.avatar_url

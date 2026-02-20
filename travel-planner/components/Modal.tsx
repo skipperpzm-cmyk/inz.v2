@@ -42,7 +42,7 @@ export default function Modal({ open, onClose, title, children, showCloseButton,
                 <button
                   type="button"
                   onClick={onClose}
-                  className="absolute top-6 right-6 z-20 inline-flex items-center justify-center w-9 h-9 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition"
+                  className="absolute top-6 right-6 z-20 inline-flex items-center justify-center w-9 h-9 rounded-lg text-white/70 opacity-80 hover:opacity-100 hover:text-white hover:bg-white/10 transition-all duration-300 ease-out"
                   aria-label="Zamknij"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">

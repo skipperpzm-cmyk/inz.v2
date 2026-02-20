@@ -135,8 +135,10 @@ export async function POST(request: Request, context: Params) {
 
   try {
     const postRows = await sqlClient`
-      select gp.id, gp.group_id, gp.board_id
+      select gp.id, gp.group_id, gp.board_id,
+             coalesce(nullif(b.details->>'archivedAt', ''), '') <> '' as is_archived
       from public.group_posts gp
+      join public.boards b on b.id = gp.board_id
       join public.board_members bm on bm.board_id = gp.board_id and bm.user_id = ${userId}
       where gp.id = ${postId}
       limit 1
@@ -144,6 +146,9 @@ export async function POST(request: Request, context: Params) {
 
     const post = Array.isArray(postRows) && postRows.length ? postRows[0] : null;
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    if (Boolean(post.is_archived)) {
+      return NextResponse.json({ error: 'Archived board is read-only' }, { status: 409 });
+    }
 
     const inserted = await sqlClient`
       insert into public.group_comments (post_id, board_id, group_id, author_id, content)

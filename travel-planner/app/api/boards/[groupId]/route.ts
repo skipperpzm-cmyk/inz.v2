@@ -51,6 +51,7 @@ export async function GET(_request: Request, context: Params) {
       left join public.profiles p on p.id = b.created_by
       left join public.users u on u.id = b.created_by
       where b.group_id = ${member.group_id}
+        and coalesce(nullif(b.details->>'archivedAt', ''), '') = ''
       order by coalesce((select max(gp.created_at) from public.group_posts gp where gp.board_id = b.id), b.updated_at, b.created_at) desc nulls last, b.created_at desc
     `;
 

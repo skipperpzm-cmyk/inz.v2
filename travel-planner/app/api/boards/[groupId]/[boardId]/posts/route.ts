@@ -5,11 +5,74 @@ import { sqlClient } from '@/src/db/db';
 type Params = { params: Promise<{ groupId: string; boardId: string }> };
 
 const MAX_POST_CONTENT = 5000;
+const MAX_MENTIONS = 20;
+const MAX_MENTION_LENGTH = 80;
+const MAX_ATTACHMENTS = 8;
+const MAX_ATTACHMENT_NAME = 180;
+const MAX_ATTACHMENT_MIME = 120;
+const MAX_DATA_URL_LENGTH = 4_000_000;
 const DEFAULT_POST_LIMIT = 20;
 const MAX_POST_LIMIT = 50;
 const DEFAULT_COMMENT_LIMIT = 10;
 const MAX_COMMENT_LIMIT = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function toNormalized(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function sanitizeString(value: unknown, maxLength: number) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+type NormalizedAttachment = {
+  id: string;
+  name: string;
+  kind: 'image' | 'file';
+  mimeType: string | null;
+  dataUrl: string | null;
+};
+
+function normalizeAttachments(value: unknown): NormalizedAttachment[] {
+  if (!Array.isArray(value)) return [];
+
+  const list: NormalizedAttachment[] = [];
+  for (const entry of value.slice(0, MAX_ATTACHMENTS)) {
+    const raw = entry as Record<string, unknown>;
+    const kind = raw?.kind === 'image' ? 'image' : 'file';
+    const id = sanitizeString(raw?.id, 64) || `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const name = sanitizeString(raw?.name, MAX_ATTACHMENT_NAME) || (kind === 'image' ? 'Obraz' : 'Załącznik');
+    const mimeType = sanitizeString(raw?.mimeType, MAX_ATTACHMENT_MIME) || null;
+    const dataUrlRaw = typeof raw?.dataUrl === 'string' ? raw.dataUrl : '';
+    const dataUrl = dataUrlRaw && dataUrlRaw.length <= MAX_DATA_URL_LENGTH && dataUrlRaw.startsWith('data:')
+      ? dataUrlRaw
+      : null;
+
+    list.push({ id, name, kind, mimeType, dataUrl });
+  }
+
+  return list;
+}
+
+
+function parseMentionNames(content: string, value: unknown): string[] {
+  const fromPayload = Array.isArray(value)
+    ? value
+        .map((entry) => sanitizeString(entry, MAX_MENTION_LENGTH))
+        .filter(Boolean)
+    : [];
+
+  const fromContent = Array.from(content.matchAll(/@([\p{L}\p{N}_.-]{1,40})/gu))
+    .map((match) => (match[1] ?? '').trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...fromPayload, ...fromContent])).slice(0, MAX_MENTIONS);
+}
+
 
 function toSafeInt(value: string | null, fallback: number, min: number, max: number) {
   const parsed = Number(value);
@@ -39,7 +102,8 @@ async function resolveBoardAccess(userId: string, groupIdOrSlug: string, boardId
 
   const rows = UUID_RE.test(groupIdOrSlug)
     ? await sqlClient`
-        select b.id as board_id, b.group_id, g.created_by, gm.role
+        select b.id as board_id, b.group_id, g.created_by, gm.role,
+               coalesce(nullif(b.details->>'archivedAt', ''), '') <> '' as is_archived
         from public.boards b
         join public.groups g on g.id = b.group_id
         join public.board_members bm on bm.board_id = b.id and bm.user_id = ${userId}
@@ -48,7 +112,8 @@ async function resolveBoardAccess(userId: string, groupIdOrSlug: string, boardId
         limit 1
       `
     : await sqlClient`
-        select b.id as board_id, b.group_id, g.created_by, gm.role
+      select b.id as board_id, b.group_id, g.created_by, gm.role,
+           coalesce(nullif(b.details->>'archivedAt', ''), '') <> '' as is_archived
         from public.boards b
         join public.groups g on g.id = b.group_id
         join public.board_members bm on bm.board_id = b.id and bm.user_id = ${userId}
@@ -85,6 +150,7 @@ export async function GET(request: Request, context: Params) {
         gp.group_id,
         gp.author_id,
         gp.content,
+        gp.attachments,
         gp.created_at,
         coalesce(nullif(u.username_display, ''), nullif(p.full_name, ''), p.username, 'Użytkownik') as author_name,
         coalesce(nullif(u.avatar_url, ''), nullif(p.avatar_url, '')) as author_avatar_url
@@ -158,6 +224,27 @@ export async function GET(request: Request, context: Params) {
           authorName: String(row.author_name ?? 'Użytkownik'),
           authorAvatarUrl: row.author_avatar_url ?? null,
           content: String(row.content ?? ''),
+          attachments: normalizeAttachments(row.attachments),
+          mentions: await (async () => {
+            const mentionRows = await client`
+              select
+                pm.mentioned_user_id,
+                p.username,
+                coalesce(nullif(u.username_display, ''), nullif(p.full_name, ''), p.username, 'Użytkownik') as display_name
+              from public.group_post_mentions pm
+              join public.profiles p on p.id = pm.mentioned_user_id
+              left join public.users u on u.id = pm.mentioned_user_id
+              where pm.post_id = ${row.id}
+              order by pm.created_at asc
+            `;
+
+            const list = Array.isArray(mentionRows) ? mentionRows : [];
+            return list.map((mention: any) => ({
+              userId: String(mention.mentioned_user_id),
+              name: String(mention.display_name ?? 'Użytkownik'),
+              username: mention.username ?? null,
+            }));
+          })(),
           createdAt: String(row.created_at),
           comments,
           commentsCount: totalCount,
@@ -193,7 +280,12 @@ export async function POST(request: Request, context: Params) {
   const content = typeof (body as { content?: unknown })?.content === 'string'
     ? (body as { content: string }).content.trim()
     : '';
-  if (!content) return NextResponse.json({ error: 'Treść posta jest wymagana' }, { status: 400 });
+  const mentionNames = parseMentionNames(content, (body as { mentions?: unknown })?.mentions);
+  const attachments = normalizeAttachments((body as { attachments?: unknown })?.attachments);
+
+  if (!content && attachments.length === 0) {
+    return NextResponse.json({ error: 'Post musi zawierać treść lub załącznik' }, { status: 400 });
+  }
   if (content.length > MAX_POST_CONTENT) {
     return NextResponse.json({ error: `Treść posta nie może przekraczać ${MAX_POST_CONTENT} znaków` }, { status: 422 });
   }
@@ -201,11 +293,14 @@ export async function POST(request: Request, context: Params) {
   try {
     const access = await resolveBoardAccess(userId, groupId, boardId);
     if (!access) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    if (Boolean(access.is_archived)) {
+      return NextResponse.json({ error: 'Archived board is read-only' }, { status: 409 });
+    }
 
     const inserted = await client`
-      insert into public.group_posts (board_id, group_id, author_id, content)
-      values (${access.board_id}, ${access.group_id}, ${userId}, ${content})
-      returning id, board_id, group_id, author_id, content, created_at
+      insert into public.group_posts (board_id, group_id, author_id, content, attachments)
+      values (${access.board_id}, ${access.group_id}, ${userId}, ${content}, ${JSON.stringify(attachments)}::jsonb)
+      returning id, board_id, group_id, author_id, content, attachments, created_at
     `;
 
     const postRow = Array.isArray(inserted) && inserted.length ? inserted[0] : null;
@@ -223,6 +318,93 @@ export async function POST(request: Request, context: Params) {
 
     const profile = Array.isArray(profileRows) && profileRows.length ? profileRows[0] : null;
 
+    const memberRows = await client`
+      select
+        bm.user_id,
+        p.username,
+        p.full_name,
+        u.username_display
+      from public.board_members bm
+      join public.profiles p on p.id = bm.user_id
+      left join public.users u on u.id = bm.user_id
+      where bm.board_id = ${access.board_id}
+    `;
+
+    const memberList = Array.isArray(memberRows) ? memberRows : [];
+    const mentionLookup = new Map<string, string>();
+    memberList.forEach((member: any) => {
+      const userIdValue = String(member.user_id);
+      const names = [member.username_display, member.full_name, member.username]
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+        .filter(Boolean);
+      names.forEach((name) => {
+        mentionLookup.set(toNormalized(name), userIdValue);
+      });
+    });
+
+    const mentionedUserIds = Array.from(new Set(
+      mentionNames
+        .map((name) => mentionLookup.get(toNormalized(name)) ?? null)
+        .filter((id): id is string => Boolean(id) && id !== userId)
+    ));
+
+    for (const mentionedUserId of mentionedUserIds) {
+      await client`
+        insert into public.group_post_mentions (post_id, board_id, group_id, mentioned_user_id, created_by)
+        values (${postRow.id}, ${access.board_id}, ${access.group_id}, ${mentionedUserId}, ${userId})
+        on conflict (post_id, mentioned_user_id) do nothing
+      `;
+
+      const notificationPayload = JSON.stringify({
+        boardId: String(access.board_id),
+        groupId: String(access.group_id),
+        postId: String(postRow.id),
+      });
+
+      await client`
+        insert into public.notifications (
+          user_id,
+          actor_user_id,
+          type,
+          title,
+          message,
+          entity_type,
+          entity_id,
+          payload,
+          created_at
+        )
+        values (
+          ${mentionedUserId},
+          ${userId},
+          'board_post_mention',
+          'Wzmianka w poście',
+          ${`${String(profile?.author_name ?? 'Użytkownik')} wspomniał(a) Cię w poście.`},
+          'group_post',
+          ${postRow.id},
+          ${notificationPayload}::jsonb,
+          now()
+        )
+      `;
+    }
+
+    const mentionRows = await client`
+      select
+        pm.mentioned_user_id,
+        p.username,
+        coalesce(nullif(u.username_display, ''), nullif(p.full_name, ''), p.username, 'Użytkownik') as display_name
+      from public.group_post_mentions pm
+      join public.profiles p on p.id = pm.mentioned_user_id
+      left join public.users u on u.id = pm.mentioned_user_id
+      where pm.post_id = ${postRow.id}
+      order by pm.created_at asc
+    `;
+
+    const mentions = (Array.isArray(mentionRows) ? mentionRows : []).map((mention: any) => ({
+      userId: String(mention.mentioned_user_id),
+      name: String(mention.display_name ?? 'Użytkownik'),
+      username: mention.username ?? null,
+    }));
+
     return NextResponse.json({
       post: {
         id: String(postRow.id),
@@ -232,6 +414,8 @@ export async function POST(request: Request, context: Params) {
         authorName: String(profile?.author_name ?? 'Użytkownik'),
         authorAvatarUrl: profile?.author_avatar_url ?? null,
         content: String(postRow.content ?? ''),
+        attachments: normalizeAttachments(postRow.attachments),
+        mentions,
         createdAt: postRow.created_at,
         comments: [],
       },

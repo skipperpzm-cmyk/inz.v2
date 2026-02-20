@@ -6,6 +6,7 @@ export type BoardAccess = {
   boardId: string;
   groupId: string;
   ownerId: string;
+  isArchived: boolean;
   isMember: boolean;
   isOwner: boolean;
   isModerator: boolean;
@@ -39,6 +40,7 @@ export async function getBoardAccessForUser(userId: string, boardId: string): Pr
     select
       b.id as board_id,
       b.group_id,
+      coalesce(nullif(b.details->>'archivedAt', ''), '') <> '' as is_archived,
       g.created_by as owner_id,
       exists (
         select 1
@@ -70,6 +72,7 @@ export async function getBoardAccessForUser(userId: string, boardId: string): Pr
     boardId: String(row.board_id),
     groupId: String(row.group_id),
     ownerId,
+    isArchived: Boolean(row.is_archived),
     isMember,
     isOwner,
     isModerator,

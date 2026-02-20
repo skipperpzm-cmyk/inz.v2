@@ -60,6 +60,7 @@ export async function POST(request: Request, context: Params) {
   try {
     const access = await getBoardAccessForUser(userId, boardId);
     if (!access) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    if (access.isArchived) return NextResponse.json({ error: 'Archived board is read-only' }, { status: 409 });
     if (!access.canModerate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     if (targetUserId === userId) {

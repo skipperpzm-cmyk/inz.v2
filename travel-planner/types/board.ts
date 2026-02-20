@@ -28,6 +28,15 @@ export type TravelInfoTransport = {
 
 export type TravelInfoDocuments = {
   notes?: string;
+  items?: Array<{
+    id: string;
+    name: string;
+    fileName?: string | null;
+    fileUrl?: string | null;
+    filePath?: string | null;
+    mimeType?: string | null;
+    sizeBytes?: number | null;
+  }>;
 };
 
 export type TravelInfoDetails = {
@@ -62,6 +71,53 @@ export type BoardComment = {
   cursor?: string | null;
 };
 
+export type TripActivity = {
+  id: string;
+  dayId: string;
+  time?: string | null;
+  title: string;
+  description?: string | null;
+  cost?: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TripDay = {
+  id: string;
+  boardId: string;
+  dayNumber: number;
+  title?: string | null;
+  date?: string | null;
+  location?: string | null;
+  description?: string | null;
+  accommodation?: string | null;
+  estimatedBudget?: number | null;
+  activities: TripActivity[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ComposerState = {
+  content: string;
+  selectionStart: number;
+  selectionEnd: number;
+  mentions: string[];
+};
+
+export type BoardPostMention = {
+  userId: string;
+  name: string;
+  username?: string | null;
+};
+
+export type BoardPostAttachment = {
+  id: string;
+  name: string;
+  kind: 'image' | 'file';
+  mimeType?: string | null;
+  dataUrl?: string | null;
+};
+
 export type BoardPost = {
   id: string;
   boardId?: string;
@@ -70,6 +126,8 @@ export type BoardPost = {
   authorName: string;
   authorAvatarUrl?: string | null;
   content: string;
+  attachments?: BoardPostAttachment[];
+  mentions?: BoardPostMention[];
   createdAt: string;
   comments: BoardComment[];
   commentsCount?: number;
@@ -129,5 +187,6 @@ export type BoardDetail = {
   isOwner?: boolean;
   isModerator?: boolean;
   canModerate?: boolean;
+  isArchived?: boolean;
   travelInfo: BoardTravelInfo;
 };

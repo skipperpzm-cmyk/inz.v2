@@ -95,6 +95,26 @@ export const sessions = pgTable('sessions', {
   expiresAt: timestamp('expires_at', { withTimezone: true }),
 });
 
+export const userSessions = pgTable(
+  'user_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    sessionStart: timestamp('session_start', { withTimezone: true }).notNull().defaultNow(),
+    sessionEnd: timestamp('session_end', { withTimezone: true }),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    durationSeconds: integer('duration_seconds'),
+    source: text('source').notNull().default('heartbeat'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('idx_user_sessions_user_id').on(table.userId),
+    sessionStartIdx: index('idx_user_sessions_session_start').on(table.sessionStart),
+    userStartIdx: index('idx_user_sessions_user_start').on(table.userId, table.sessionStart),
+  })
+);
+
 export const magicLinks = pgTable(
   'magic_links',
   {
@@ -261,14 +281,20 @@ export const groupPosts = pgTable(
   'group_posts',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    boardId: uuid('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
     groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
     content: text('content').notNull(),
     attachments: jsonb('attachments').notNull().default(sql`'[]'::jsonb`),
+    locationName: text('location_name'),
+    locationLat: numeric('location_lat', { precision: 9, scale: 6 }),
+    locationLng: numeric('location_lng', { precision: 9, scale: 6 }),
+    mapEmbedUrl: text('map_embed_url'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    boardCreatedAtIdx: index('idx_group_posts_board_id_created_at').on(table.boardId, table.createdAt),
     groupCreatedAtIdx: index('idx_group_posts_group_id_created_at').on(table.groupId, table.createdAt),
   })
 );
@@ -278,6 +304,7 @@ export const groupComments = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     postId: uuid('post_id').notNull().references(() => groupPosts.id, { onDelete: 'cascade' }),
+    boardId: uuid('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
     groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
     content: text('content').notNull(),
@@ -286,7 +313,64 @@ export const groupComments = pgTable(
   },
   (table) => ({
     postCreatedAtIdx: index('idx_group_comments_post_id_created_at').on(table.postId, table.createdAt),
+    boardIdx: index('idx_group_comments_board_id').on(table.boardId),
+    postIdx: index('idx_group_comments_post_id').on(table.postId),
     groupCreatedAtIdx: index('idx_group_comments_group_id_created_at').on(table.groupId, table.createdAt),
+  })
+);
+
+export const groupPostMentions = pgTable(
+  'group_post_mentions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    postId: uuid('post_id').notNull().references(() => groupPosts.id, { onDelete: 'cascade' }),
+    boardId: uuid('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
+    groupId: uuid('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
+    mentionedUserId: uuid('mentioned_user_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    postIdx: index('idx_group_post_mentions_post_id').on(table.postId),
+    boardIdx: index('idx_group_post_mentions_board_id').on(table.boardId),
+    mentionedUserIdx: index('idx_group_post_mentions_mentioned_user_id').on(table.mentionedUserId),
+  })
+);
+
+export const boardTripDays = pgTable(
+  'board_trip_days',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    boardId: uuid('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
+    dayNumber: integer('day_number').notNull(),
+    title: text('title'),
+    date: date('date'),
+    location: text('location'),
+    description: text('description'),
+    accommodation: text('accommodation'),
+    estimatedBudget: numeric('estimated_budget', { precision: 12, scale: 2 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    boardDayIdx: index('idx_board_trip_days_board_day').on(table.boardId, table.dayNumber),
+  })
+);
+
+export const boardTripActivities = pgTable(
+  'board_trip_activities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    dayId: uuid('day_id').notNull().references(() => boardTripDays.id, { onDelete: 'cascade' }),
+    time: text('time'),
+    title: text('title').notNull(),
+    description: text('description'),
+    cost: numeric('cost', { precision: 12, scale: 2 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    dayCreatedAtIdx: index('idx_board_trip_activities_day_created_at').on(table.dayId, table.createdAt),
   })
 );
 
@@ -300,6 +384,8 @@ export type BoardItemRow = typeof boardItems.$inferSelect;
 export type InsertBoardItemRow = typeof boardItems.$inferInsert;
 export type SessionRow = typeof sessions.$inferSelect;
 export type InsertSessionRow = typeof sessions.$inferInsert;
+export type UserSessionRow = typeof userSessions.$inferSelect;
+export type InsertUserSessionRow = typeof userSessions.$inferInsert;
 export type MagicLinkRow = typeof magicLinks.$inferSelect;
 export type InsertMagicLinkRow = typeof magicLinks.$inferInsert;
 export type ChatMessageRow = typeof chatMessages.$inferSelect;
@@ -328,3 +414,9 @@ export type GroupPostRow = typeof groupPosts.$inferSelect;
 export type InsertGroupPostRow = typeof groupPosts.$inferInsert;
 export type GroupCommentRow = typeof groupComments.$inferSelect;
 export type InsertGroupCommentRow = typeof groupComments.$inferInsert;
+export type GroupPostMentionRow = typeof groupPostMentions.$inferSelect;
+export type InsertGroupPostMentionRow = typeof groupPostMentions.$inferInsert;
+export type BoardTripDayRow = typeof boardTripDays.$inferSelect;
+export type InsertBoardTripDayRow = typeof boardTripDays.$inferInsert;
+export type BoardTripActivityRow = typeof boardTripActivities.$inferSelect;
+export type InsertBoardTripActivityRow = typeof boardTripActivities.$inferInsert;

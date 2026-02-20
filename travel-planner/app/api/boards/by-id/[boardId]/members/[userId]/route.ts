@@ -20,6 +20,7 @@ export async function DELETE(_request: Request, context: Params) {
   try {
     const access = await getBoardAccessForUser(requesterId, boardId);
     if (!access) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    if (access.isArchived) return NextResponse.json({ error: 'Archived board is read-only' }, { status: 409 });
     if (!access.canModerate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (userId === access.ownerId) {
       return NextResponse.json({ error: 'Cannot remove board owner from board members' }, { status: 422 });

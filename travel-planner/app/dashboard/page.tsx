@@ -1,7 +1,7 @@
 import StatWidget from '../../components/StatWidget';
 import Card from '../../components/Card';
 import Button from '../../components/ui/button';
-import { getCurrentUser, getCurrentUserId } from '../../lib/auth';
+import { getCurrentUser, getCurrentUserIdWithReason } from '../../lib/auth';
 import { getTripsByUser } from '../../src/db/repositories/trip.repository';
 import { getBoardsByTripId } from '../../src/db/repositories/board.repository';
 import { getItemsByBoardId } from '../../src/db/repositories/boardItem.repository';
@@ -24,10 +24,29 @@ function formatStatusLabel(status?: string | null) {
 const formatDateLabel = (value?: string | null) => value ?? 'Do ustalenia';
 
 export default async function DashboardPage() {
-    const userId = await getCurrentUserId();
-    if (!userId) {
+    const auth = await getCurrentUserIdWithReason();
+    if (!auth.userId && auth.reason === 'not-authenticated') {
         redirect('/login');
     }
+
+    if (!auth.userId && auth.reason === 'db-timeout') {
+        return (
+            <div className="space-y-4 lg:pl-6">
+                <Card className="dashboard-card justify-start">
+                    <div className="space-y-2">
+                        <h2 className="text-lg font-semibold text-white">Chwilowy problem z połączeniem</h2>
+                        <p className="text-sm text-slate-300">Nie udało się zweryfikować sesji. Odśwież stronę za chwilę.</p>
+                    </div>
+                </Card>
+            </div>
+        );
+    }
+
+    if (!auth.userId) {
+        redirect('/login');
+    }
+
+    const userId = auth.userId;
 
     const user = await getCurrentUser();
 

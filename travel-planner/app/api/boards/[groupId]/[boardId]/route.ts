@@ -88,6 +88,10 @@ export async function GET(_request: Request, context: Params) {
 
     const checklist = Array.isArray(row.checklist) ? row.checklist.map((item: unknown) => String(item)) : [];
     const details = row.details && typeof row.details === 'object' ? row.details : {};
+    const archivedAtValue = typeof (details as { archivedAt?: unknown })?.archivedAt === 'string'
+      ? String((details as { archivedAt?: string }).archivedAt).trim()
+      : '';
+    const isArchived = archivedAtValue.length > 0;
     const isOwner = String(row.owner_id ?? '') === String(userId);
     const isModerator = Boolean(row.is_moderator);
 
@@ -106,6 +110,7 @@ export async function GET(_request: Request, context: Params) {
       isOwner,
       isModerator,
       canModerate: isOwner || isModerator,
+      isArchived,
       travelInfo: {
         location: row.location ?? null,
         startDate: row.start_date ?? null,
